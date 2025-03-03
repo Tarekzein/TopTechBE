@@ -1,3 +1,5 @@
 {
-    "Vendor": true
+    "Vendor": true,
+    "Authentication": true,
+    "User": true
 }
