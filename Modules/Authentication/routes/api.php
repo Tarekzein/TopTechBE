@@ -14,6 +14,9 @@ use Modules\Authentication\Http\Controllers\AuthenticationController;
  *
 */
 
-Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
-    Route::apiResource('authentication', AuthenticationController::class)->names('authentication');
+Route::prefix('auth')->group(function () {
+    Route::post('/register', [AuthenticationController::class, 'register']);
+    Route::post('/vendor-register', [AuthenticationController::class, 'vendorRegister']);
+    Route::post('/login', [AuthenticationController::class, 'login']);
+    Route::post('/logout', [AuthenticationController::class, 'logout'])->middleware('auth:sanctum');
 });

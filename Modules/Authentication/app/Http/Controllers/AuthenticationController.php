@@ -27,6 +27,21 @@ class AuthenticationController extends Controller
         return response()->json($this->auth_service->register($data), 201);
     }
 
+    public function vendorRegister(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6|confirmed',
+            'store_name' => 'required|string|max:255',
+            'description' => 'required|string',
+            'address' => 'required|string',
+            'logo' => 'sometimes',
+            'banner' => 'sometimes',
+        ]);
+
+        return response()->json($this->auth_service->vendorRegister($data), 201);
+    }
     public function login(Request $request)
     {
         $credentials = $request->validate([
