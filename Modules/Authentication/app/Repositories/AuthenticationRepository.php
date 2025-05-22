@@ -63,6 +63,7 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
             }
 
             $user = Auth::user();
+            $user->load('roles');
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return ['user' => $user, 'token' => $token];

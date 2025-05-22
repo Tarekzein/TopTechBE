@@ -82,8 +82,9 @@ class AuthenticationController extends Controller
 
             $result = $this->auth_service->login($credentials);
             
-            if (isset($result['message']) && $result['message'] === 'Invalid credentials') {
-                return response()->json($result, 401);
+            // If the result is already a JsonResponse, return it directly
+            if ($result instanceof \Illuminate\Http\JsonResponse) {
+                return $result;
             }
             
             return response()->json($result, 200);

@@ -11,7 +11,7 @@ class SwaggerUiServiceProvider extends ServiceProvider
     {
         Gate::define('viewSwaggerUI', function ($user = null) {
             return in_array(optional($user)->email, [
-                //
+                'info@aiwagroup.org',
             ]);
         });
     }
