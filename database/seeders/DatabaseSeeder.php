@@ -21,6 +21,14 @@ class DatabaseSeeder extends Seeder
         $role3 = Role::create(['name' => 'manager']);
         $role4 = Role::create(['name' => 'vendor']);
         $role5 = Role::create(['name' => 'customer']);
-        User::find(1)->assignRole($role1);
+
+        $user = User::create([
+            'first_name' => 'Aiwa',
+            'last_name' => 'Admin',
+            'email' => 'info@aiwagroup.org',
+            'password' => bcrypt('password'),
+        ]);
+        $user->assignRole($role1);
+        
     }
 }

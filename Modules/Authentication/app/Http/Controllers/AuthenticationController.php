@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Authentication\Interfaces\AuthenticationServiceInterface;
 use Illuminate\Support\Facades\Auth;
+use Exception;
+use Illuminate\Validation\ValidationException;
 
 class AuthenticationController extends Controller
 {
@@ -18,42 +20,102 @@ class AuthenticationController extends Controller
 
     public function register(Request $request)
     {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6|confirmed',
-        ]);
+        try {
+            $data = $request->validate([
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email',
+                'password' => 'required|min:6|confirmed',
+            ]);
 
-        return response()->json($this->auth_service->register($data), 201);
+            $result = $this->auth_service->register($data);
+            return response()->json($result, 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Registration failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function vendorRegister(Request $request)
     {
-        $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6|confirmed',
-            'store_name' => 'required|string|max:255',
-            'description' => 'required|string',
-            'address' => 'required|string',
-            'logo' => 'sometimes',
-            'banner' => 'sometimes',
-        ]);
+        try {
+            $data = $request->validate([
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'email' => 'required|email|unique:users,email',
+                'password' => 'required|min:6|confirmed',
+                'corporate_name' => 'required|string|max:255',
+                'tax_number' => 'required|string',
+                'device_type' => 'required|string',
+                'with_components' => 'boolean',
+            ]);
 
-        return response()->json($this->auth_service->vendorRegister($data), 201);
+            $result = $this->auth_service->vendorRegister($data);
+            return response()->json($result, 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Vendor registration failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
+
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
+        try {
+            $credentials = $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string',
+            ]);
 
-        return response()->json($this->auth_service->login($credentials), 200);
+            $result = $this->auth_service->login($credentials);
+            
+            if (isset($result['message']) && $result['message'] === 'Invalid credentials') {
+                return response()->json($result, 401);
+            }
+            
+            return response()->json($result, 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Login failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function logout()
     {
-        return response()->json($this->auth_service->logout(Auth::user()), 200);
+        try {
+            if (!Auth::check()) {
+                return response()->json([
+                    'message' => 'No authenticated user found'
+                ], 401);
+            }
+
+            $result = $this->auth_service->logout(Auth::user());
+            return response()->json($result, 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Logout failed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

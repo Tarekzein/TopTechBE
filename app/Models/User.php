@@ -23,7 +23,8 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'name',
+        'first_name',
+        'last_name',
         'slug',
         'email',
         'password',
@@ -55,7 +56,7 @@ class User extends Authenticatable
     {
         return [
             'slug' => [
-                'source' => 'name'
+                'source' => 'first_name'
             ]
         ];
     }

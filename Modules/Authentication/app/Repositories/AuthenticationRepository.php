@@ -7,6 +7,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Modules\User\Interfaces\UserRepositoryInterface;
+use Illuminate\Support\Facades\DB;
+use Exception;
 
 class AuthenticationRepository implements AuthenticationRepositoryInterface
 {
@@ -16,40 +18,71 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
     {
         $this->users_repository = $users_repository;
     }
+
     public function register(array $data)
     {
-        $user = $this->users_repository->create($data);
-        $user->assignRole('customer');
-        $user->load('roles');
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return ['user' => $user, 'token' => $token];
+        try {
+            DB::beginTransaction();
+            
+            $user = $this->users_repository->create($data);
+            $user->assignRole('customer');
+            $user->load('roles');
+            $token = $user->createToken('auth_token')->plainTextToken;
+            
+            DB::commit();
+            return ['user' => $user, 'token' => $token];
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw new Exception('Error during registration: ' . $e->getMessage());
+        }
     }
 
     public function vendorRegister(array $data)
     {
-        $user = $this->users_repository->create($data);
-        $user->assignRole('vendor');
-        $user->load('roles');
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return ['user' => $user, 'token' => $token];
+        try {
+            DB::beginTransaction();
+            
+            $user = $this->users_repository->create($data);
+            $user->assignRole('vendor');
+            $user->load('roles');
+            $token = $user->createToken('auth_token')->plainTextToken;
+            
+            DB::commit();
+            return ['user' => $user, 'token' => $token];
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw new Exception('Error during vendor registration: ' . $e->getMessage());
+        }
     }
+
     public function login(array $credentials)
     {
-        if (!Auth::attempt($credentials)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+        try {
+            if (!Auth::attempt($credentials)) {
+                return response()->json(['message' => 'Invalid credentials'], 401);
+            }
+
+            $user = Auth::user();
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return ['user' => $user, 'token' => $token];
+        } catch (Exception $e) {
+            throw new Exception('Error during login: ' . $e->getMessage());
         }
-
-        $user = Auth::user();
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return ['user' => $user, 'token' => $token];
     }
 
     public function logout($user)
     {
-        $user->tokens()->delete();
-        return ['message' => 'Logged out successfully'];
+        try {
+            DB::beginTransaction();
+            
+            $user->tokens()->delete();
+            
+            DB::commit();
+            return ['message' => 'Logged out successfully'];
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw new Exception('Error during logout: ' . $e->getMessage());
+        }
     }
 }

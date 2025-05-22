@@ -16,12 +16,10 @@ class Vendor extends Model
      */
     protected $fillable = [
         'user_id',
-        'store_name',
-        'slug',
-        'description',
-        'address',
-        'logo',
-        'banner',
+        'corporate_name',
+        'tax_number',
+        'device_type',
+        'with_components',
         'is_active',
         'is_verified',
     ];
@@ -30,8 +28,28 @@ class Vendor extends Model
     {
         return [
             'slug' => [
-                'source' => 'store_name'
+                'source' => 'corporate_name'
             ]
         ];
+    }
+
+    public function settings()
+    {
+        return $this->hasMany(VendorSetting::class);
+    }
+
+    public function getSetting($key)
+    {
+        return $this->settings()->where('key', $key)->first();
+    }
+
+    public function components()
+    {
+        return $this->hasMany(VendorComponent::class);
+    }
+
+    public function getComponent($name)
+    {
+        return $this->components()->where('name', $name)->first();
     }
 }

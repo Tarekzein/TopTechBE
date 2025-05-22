@@ -5,6 +5,9 @@ namespace Modules\Vendor\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Vendor\Interfaces\VendorServiceInterface;
+use Exception;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class VendorController extends Controller
 {
@@ -17,44 +20,105 @@ class VendorController extends Controller
 
     public function index()
     {
-        return response()->json($this->vendor_service->getAll(), 200);
+        try {
+            $vendors = $this->vendor_service->getAll();
+            return response()->json($vendors, 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch vendors',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function show($id)
     {
-        return response()->json($this->vendor_service->getById($id), 200);
+        try {
+            $vendor = $this->vendor_service->getById($id);
+            return response()->json($vendor, 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Vendor not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch vendor',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'store_name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'address' => 'nullable|string',
-            'logo' => 'nullable|string',
-            'banner' => 'nullable|string',
-        ]);
+        try {
+            $data = $request->validate([
+                'user_id' => 'required|exists:users,id',
+                'corporate_name' => 'required|string|max:255',
+                'tax_number' => 'required|string',
+                'device_type' => 'required|string',
+                'with_components' => 'boolean',
+            ]);
 
-        return response()->json($this->vendor_service->create($data), 201);
+            $vendor = $this->vendor_service->create($data);
+            return response()->json($vendor, 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to create vendor',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function update(Request $request, $id)
     {
-        $data = $request->validate([
-            'store_name' => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'logo' => 'nullable|string',
-            'banner' => 'nullable|string',
-            'address' => 'nullable|string',
-            'is_verified' => 'boolean',
-        ]);
+        try {
+            $data = $request->validate([
+                'corporate_name' => 'sometimes|string|max:255',
+                'tax_number' => 'nullable|string',
+                'device_type' => 'nullable|string',
+                'with_components' => 'boolean',
+            ]);
 
-        return response()->json($this->vendor_service->update($id, $data), 200);
+            $vendor = $this->vendor_service->update($id, $data);
+            return response()->json($vendor, 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Vendor not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to update vendor',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function destroy($id)
     {
-        return response()->json(['message' => 'Vendor deleted successfully'], 200);
+        try {
+            $this->vendor_service->delete($id);
+            return response()->json([
+                'message' => 'Vendor deleted successfully'
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Vendor not found'
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to delete vendor',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

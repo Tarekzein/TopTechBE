@@ -4,41 +4,81 @@ namespace Modules\User\Repositories;
 
 use Modules\User\Interfaces\UserRepositoryInterface;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Exception;
 
 class UserRepository implements UserRepositoryInterface
 {
     public function getAll()
     {
-        return User::all();
+        try {
+            return User::all();
+        } catch (Exception $e) {
+            throw new Exception('Error fetching users: ' . $e->getMessage());
+        }
     }
 
     public function findById($id)
     {
-        return User::findOrFail($id);
+        try {
+            return User::findOrFail($id);
+        } catch (Exception $e) {
+            throw new Exception('Error finding user: ' . $e->getMessage());
+        }
     }
 
     public function create(array $data)
     {
-        return User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => bcrypt($data['password']),
-        ]);
+        try {
+            DB::beginTransaction();
+            
+            $user = User::create([
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'email' => $data['email'],
+                'password' => bcrypt($data['password']),
+            ]);
+            
+            DB::commit();
+            return $user;
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw new Exception('Error creating user: ' . $e->getMessage());
+        }
     }
 
     public function update($id, array $data)
     {
-        $user = User::findOrFail($id);
-        if (isset($data['password'])) {
-            $data['password'] = bcrypt($data['password']);
+        try {
+            DB::beginTransaction();
+            
+            $user = User::findOrFail($id);
+            if (isset($data['password'])) {
+                $data['password'] = bcrypt($data['password']);
+            }
+            $user->update($data);
+            
+            DB::commit();
+            return $user;
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw new Exception('Error updating user: ' . $e->getMessage());
         }
-        $user->update($data);
-        return $user;
     }
 
     public function delete($id)
     {
-        $user = User::findOrFail($id);
-        return $user->delete();
+        try {
+            DB::beginTransaction();
+            
+            $user = User::findOrFail($id);
+            $result = $user->delete();
+            
+            DB::commit();
+            return $result;
+        } catch (Exception $e) {
+            DB::rollBack();
+            throw new Exception('Error deleting user: ' . $e->getMessage());
+        }
     }
 }
