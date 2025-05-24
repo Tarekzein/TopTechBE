@@ -2,6 +2,10 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Store\Http\Controllers\CategoryController;
 use Modules\Store\Http\Controllers\ProductController;
+use Modules\Store\Http\Controllers\CartController;
+use Modules\Store\Http\Controllers\WishlistController;
+use Modules\Store\Http\Controllers\ProductAttributeController;
+use Modules\Store\Http\Controllers\ProductVariationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -42,5 +46,54 @@ Route::prefix('store')->group(function () {
             Route::put('/{id}', [ProductController::class, 'update'])->name('store.products.update');
             Route::delete('/{id}', [ProductController::class, 'destroy'])->name('store.products.destroy');
         });
+    });
+
+    // Product Attributes
+    Route::prefix('attributes')->group(function () {
+        Route::get('/', [ProductAttributeController::class, 'index']);
+        Route::post('/', [ProductAttributeController::class, 'store']);
+        Route::get('/{id}', [ProductAttributeController::class, 'show']);
+        Route::put('/{id}', [ProductAttributeController::class, 'update']);
+        Route::delete('/{id}', [ProductAttributeController::class, 'destroy']);
+
+        // Attribute Values
+        Route::get('/{attributeId}/values', [ProductAttributeController::class, 'getValues']);
+        Route::post('/values', [ProductAttributeController::class, 'storeValue']);
+        Route::get('/values/{id}', [ProductAttributeController::class, 'getValue']);
+        Route::put('/values/{id}', [ProductAttributeController::class, 'updateValue']);
+        Route::delete('/values/{id}', [ProductAttributeController::class, 'destroyValue']);
+    });
+
+    // Product Variations
+    Route::prefix('products/{productId}/variations')->group(function () {
+        Route::get('/', [ProductVariationController::class, 'index']);
+        Route::post('/', [ProductVariationController::class, 'store']);
+        Route::get('/{id}', [ProductVariationController::class, 'show']);
+        Route::put('/{id}', [ProductVariationController::class, 'update']);
+        Route::delete('/{id}', [ProductVariationController::class, 'destroy']);
+
+        // Variation Images
+        Route::post('/images', [ProductVariationController::class, 'addImage']);
+        Route::delete('/images/{id}', [ProductVariationController::class, 'removeImage']);
+        Route::put('/images/order', [ProductVariationController::class, 'updateImageOrder']);
+    });
+
+    // Cart Routes
+    Route::prefix('cart')->group(function () {
+        Route::get('/', [CartController::class, 'getCart'])->name('store.cart.get');
+        Route::post('/add', [CartController::class, 'addItem'])->name('store.cart.add');
+        Route::put('/update', [CartController::class, 'updateItem'])->name('store.cart.update');
+        Route::delete('/remove', [CartController::class, 'removeItem'])->name('store.cart.remove');
+        Route::delete('/clear', [CartController::class, 'clearCart'])->name('store.cart.clear');
+        Route::post('/merge', [CartController::class, 'mergeOnLogin'])->middleware('auth:sanctum')->name('store.cart.merge');
+    });
+
+    // Wishlist Routes
+    Route::prefix('wishlist')->group(function () {
+        Route::get('/', [WishlistController::class, 'index']);
+        Route::post('/items', [WishlistController::class, 'addItem']);
+        Route::delete('/items/{productId}', [WishlistController::class, 'removeItem']);
+        Route::delete('/', [WishlistController::class, 'clear']);
+        Route::post('/merge', [WishlistController::class, 'merge'])->middleware('auth:api');
     });
 });

@@ -7,16 +7,25 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Modules\User\Interfaces\UserRepositoryInterface;
+use Modules\Store\Services\CartService;
+use Modules\Store\Services\WishlistService;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
 class AuthenticationRepository implements AuthenticationRepositoryInterface
 {
     protected $users_repository;
+    protected $cartService;
+    protected $wishlistService;
 
-    public function __construct(UserRepositoryInterface $users_repository)
-    {
+    public function __construct(
+        UserRepositoryInterface $users_repository,
+        CartService $cartService,
+        WishlistService $wishlistService
+    ) {
         $this->users_repository = $users_repository;
+        $this->cartService = $cartService;
+        $this->wishlistService = $wishlistService;
     }
 
     public function register(array $data)
@@ -66,7 +75,16 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
             $user->load('roles');
             $token = $user->createToken('auth_token')->plainTextToken;
 
-            return ['user' => $user, 'token' => $token];
+            // Get user's cart and wishlist
+            $cart = $this->cartService->getOrCreateCart($user->id);
+            $wishlist = $this->wishlistService->getWishlist($user->id);
+
+            return [
+                'user' => $user,
+                'token' => $token,
+                'cart' => $cart->load('items.product'),
+                'wishlist' => $wishlist ? $wishlist->load('items.product') : null
+            ];
         } catch (Exception $e) {
             throw new Exception('Error during login: ' . $e->getMessage());
         }

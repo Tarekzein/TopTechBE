@@ -3,6 +3,8 @@
 namespace Modules\Store\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Modules\Store\Repositories\CartRepository;
+use Modules\Store\Services\CartService;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -26,5 +28,15 @@ class EventServiceProvider extends ServiceProvider
     protected function configureEmailVerification(): void
     {
         //
+    }
+
+    public function register()
+    {
+        $this->app->singleton(CartRepository::class, function ($app) {
+            return new CartRepository();
+        });
+        $this->app->singleton(CartService::class, function ($app) {
+            return new CartService($app->make(CartRepository::class));
+        });
     }
 }
