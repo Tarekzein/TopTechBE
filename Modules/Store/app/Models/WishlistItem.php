@@ -1,10 +1,11 @@
 <?php
 
-namespace Modules\Store\Entities;
+namespace Modules\Store\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Store\Entities\Product;
 
 class WishlistItem extends Model
 {
@@ -24,4 +25,4 @@ class WishlistItem extends Model
     {
         return $this->belongsTo(Product::class);
     }
-} 
+}

@@ -1,11 +1,12 @@
 <?php
 
-namespace Modules\Store\Entities;
+namespace Modules\Store\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\Store\Entities\User;
 
 class Cart extends Model
 {
@@ -25,4 +26,4 @@ class Cart extends Model
     {
         return $this->hasMany(CartItem::class);
     }
-} 
+}

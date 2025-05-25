@@ -25,7 +25,7 @@ Route::prefix('store')->group(function () {
         Route::get('/id/{id}', [CategoryController::class, 'show'])->name('store.categories.show');
 
         // Protected routes - Admin only
-        Route::middleware(['auth:sanctum', 'role:admin,super-admin'])->group(function () {
+        Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
             Route::post('/', [CategoryController::class, 'store'])->name('store.categories.store');
             Route::put('/{id}', [CategoryController::class, 'update'])->name('store.categories.update');
             Route::delete('/{id}', [CategoryController::class, 'destroy'])->name('store.categories.destroy');
@@ -109,7 +109,7 @@ Route::prefix('store')->group(function () {
         });
 
         // Admin routes
-        Route::middleware(['role:admin,super-admin'])->prefix('admin/orders')->group(function () {
+        Route::middleware(['role:admin|super-admin'])->prefix('admin/orders')->group(function () {
             Route::get('/', [OrderController::class, 'adminIndex']);
             Route::patch('/{orderNumber}/status', [OrderController::class, 'updateStatus']);
             Route::patch('/{orderNumber}/payment-status', [OrderController::class, 'updatePaymentStatus']);
@@ -137,5 +137,17 @@ Route::prefix('store')->group(function () {
         Route::post('/shipping-addresses', [AddressController::class, 'createShippingAddress']);
         Route::put('/shipping-addresses/{address}', [AddressController::class, 'updateShippingAddress']);
         Route::delete('/shipping-addresses/{address}', [AddressController::class, 'deleteShippingAddress']);
+        
+    });
+
+    Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
+        // Settings routes
+        Route::prefix('settings')->group(function () {
+            Route::get('/', 'SettingController@index');
+            Route::get('/groups', 'SettingController@getGroups');
+            Route::get('/{key}', 'SettingController@show');
+            Route::put('/{key}', 'SettingController@update');
+            Route::put('/bulk-update', 'SettingController@bulkUpdate');
+        });
     });
 });

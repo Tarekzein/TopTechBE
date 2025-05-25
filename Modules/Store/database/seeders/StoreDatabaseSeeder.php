@@ -3,6 +3,7 @@
 namespace Modules\Store\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Modules\Store\Database\Seeders\StoreSettingsSeeder;
 
 class StoreDatabaseSeeder extends Seeder
 {
@@ -11,6 +12,8 @@ class StoreDatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // $this->call([]);
+        $this->call([
+            StoreSettingsSeeder::class,
+        ]);
     }
 }

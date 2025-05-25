@@ -2,10 +2,9 @@
 
 namespace Modules\Store\Repositories;
 
-use Modules\Store\Entities\Wishlist;
-use Modules\Store\Entities\WishlistItem;
-use Illuminate\Support\Facades\DB;
 use Exception;
+use Illuminate\Support\Facades\DB;
+use Modules\Store\Models\Wishlist;
 
 class WishlistRepository
 {
@@ -102,4 +101,4 @@ class WishlistRepository
             throw $e;
         }
     }
-} 
+}

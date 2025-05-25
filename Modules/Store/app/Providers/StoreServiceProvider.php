@@ -12,6 +12,15 @@ use Modules\Store\Policies\ShippingAddressPolicy;
 use Modules\Store\Models\BillingAddress;
 use Modules\Store\Models\ShippingAddress;
 use Illuminate\Support\Facades\Gate;
+use Modules\Store\App\Repositories\Interfaces\CurrencyRepositoryInterface;
+use Modules\Store\App\Repositories\Interfaces\SettingRepositoryInterface;
+use Modules\Store\App\Services\Interfaces\CurrencyServiceInterface;
+use Modules\Store\App\Services\Interfaces\SettingServiceInterface;
+use Modules\Store\App\Repositories\CurrencyRepository;
+use Modules\Store\App\Repositories\SettingRepository;
+use Modules\Store\App\Services\CurrencyService;
+use Modules\Store\App\Services\SettingService;
+use Modules\Store\App\Console\Commands\UpdateExchangeRates;
 
 class StoreServiceProvider extends ServiceProvider
 {
@@ -22,17 +31,37 @@ class StoreServiceProvider extends ServiceProvider
     protected string $nameLower = 'store';
 
     /**
+     * The commands to register.
+     *
+     * @var array
+     */
+    protected $commands = [
+        UpdateExchangeRates::class,
+    ];
+
+    /**
      * Boot the application events.
      */
     public function boot(): void
     {
-        $this->registerCommands();
-        $this->registerCommandSchedules();
         $this->registerTranslations();
         $this->registerConfig();
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
         $this->registerPolicies();
+        $this->loadRoutesFrom(module_path($this->name, 'routes/api.php'));
+        $this->publishes([
+            module_path($this->name, 'config/store.php') => config_path('store.php'),
+        ], 'store-config');
+        $this->publishes([
+            module_path($this->name, 'database/migrations') => database_path('migrations'),
+        ], 'store-migrations');
+        $this->publishes([
+            module_path($this->name, 'resources/lang') => resource_path('lang/vendor/store'),
+        ], 'store-translations');
+        $this->publishes([
+            module_path($this->name, 'resources/views') => resource_path('views/vendor/store'),
+        ], 'store-views');
     }
 
     /**
@@ -42,6 +71,9 @@ class StoreServiceProvider extends ServiceProvider
     {
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
+        $this->registerCommands();
+        $this->bindRepositories();
+        $this->bindServices();
     }
 
     /**
@@ -49,7 +81,7 @@ class StoreServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands($this->commands);
     }
 
     /**
@@ -143,5 +175,17 @@ class StoreServiceProvider extends ServiceProvider
     {
         Gate::policy(BillingAddress::class, BillingAddressPolicy::class);
         Gate::policy(ShippingAddress::class, ShippingAddressPolicy::class);
+    }
+
+    protected function bindRepositories()
+    {
+        $this->app->bind(CurrencyRepositoryInterface::class, CurrencyRepository::class);
+        $this->app->bind(SettingRepositoryInterface::class, SettingRepository::class);
+    }
+
+    protected function bindServices()
+    {
+        $this->app->bind(CurrencyServiceInterface::class, CurrencyService::class);
+        $this->app->bind(SettingServiceInterface::class, SettingService::class);
     }
 }
