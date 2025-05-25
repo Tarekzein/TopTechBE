@@ -2,9 +2,9 @@
 
 namespace Modules\Store\App\Repositories;
 
-use Modules\Store\App\Models\Currency;
 use Illuminate\Database\Eloquent\Collection;
-use Modules\Store\App\Repositories\Interfaces\CurrencyRepositoryInterface;
+use Modules\Store\App\Models\Currency;
+use Modules\Store\Interfaces\CurrencyRepositoryInterface;
 
 class CurrencyRepository implements CurrencyRepositoryInterface
 {
@@ -55,7 +55,7 @@ class CurrencyRepository implements CurrencyRepositoryInterface
         return \DB::transaction(function () use ($currency) {
             // Remove default from all currencies
             $this->model->where('is_default', true)->update(['is_default' => false]);
-            
+
             // Set the new default
             return $currency->update(['is_default' => true]);
         });
@@ -75,7 +75,7 @@ class CurrencyRepository implements CurrencyRepositoryInterface
         }
 
         $defaultRate = $rates[$defaultCurrency->code] ?? 1.0;
-        
+
         foreach ($rates as $code => $rate) {
             if ($code === $defaultCurrency->code) {
                 continue;
@@ -102,4 +102,4 @@ class CurrencyRepository implements CurrencyRepositoryInterface
     {
         return $this->model->where('code', $code)->first();
     }
-} 
+}

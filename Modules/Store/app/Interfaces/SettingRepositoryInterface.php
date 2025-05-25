@@ -1,9 +1,9 @@
 <?php
 
-namespace Modules\Store\App\Repositories\Interfaces;
+namespace  Modules\Store\Interfaces;
 
-use Modules\Store\App\Models\Setting;
 use Illuminate\Database\Eloquent\Collection;
+use Modules\Store\App\Models\Setting;
 
 interface SettingRepositoryInterface
 {
@@ -72,4 +72,4 @@ interface SettingRepositoryInterface
      * @return Collection
      */
     public function getAllWithValues(?string $locale = null): Collection;
-} 
+}

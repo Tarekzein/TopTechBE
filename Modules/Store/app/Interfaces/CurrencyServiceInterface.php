@@ -1,9 +1,9 @@
 <?php
 
-namespace Modules\Store\App\Services\Interfaces;
+namespace  Modules\Store\Interfaces;
 
-use Modules\Store\App\Models\Currency;
 use Illuminate\Database\Eloquent\Collection;
+use Modules\Store\App\Models\Currency;
 
 interface CurrencyServiceInterface
 {
@@ -79,4 +79,4 @@ interface CurrencyServiceInterface
      * @return bool
      */
     public function deleteCurrency(string $code): bool;
-} 
+}

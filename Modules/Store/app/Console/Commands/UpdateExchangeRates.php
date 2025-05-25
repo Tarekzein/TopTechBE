@@ -3,7 +3,7 @@
 namespace Modules\Store\App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Modules\Store\App\Services\Interfaces\CurrencyServiceInterface;
+use Modules\Store\Interfaces\CurrencyServiceInterface;
 
 class UpdateExchangeRates extends Command
 {
@@ -63,4 +63,4 @@ class UpdateExchangeRates extends Command
             return 1;
         }
     }
-} 
+}

@@ -2,12 +2,12 @@
 
 namespace Modules\Store\App\Services;
 
-use Modules\Store\App\Models\Currency;
 use Illuminate\Database\Eloquent\Collection;
-use Modules\Store\App\Services\Interfaces\CurrencyServiceInterface;
-use Modules\Store\App\Repositories\Interfaces\CurrencyRepositoryInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Modules\Store\App\Models\Currency;
+use Modules\Store\Interfaces\CurrencyRepositoryInterface;
+use Modules\Store\Interfaces\CurrencyServiceInterface;
 
 class CurrencyService implements CurrencyServiceInterface
 {
@@ -141,7 +141,7 @@ class CurrencyService implements CurrencyServiceInterface
 
             // Fetch rates from external API (example using exchangerate-api.com)
             $response = Http::get('https://api.exchangerate-api.com/v4/latest/' . $defaultCurrency->code);
-            
+
             if (!$response->successful()) {
                 Log::error('Failed to fetch exchange rates', [
                     'status' => $response->status(),
@@ -188,7 +188,7 @@ class CurrencyService implements CurrencyServiceInterface
 
             // Create currency
             $currency = new Currency($data);
-            
+
             // If this is the first currency, set it as default
             if ($this->getActiveCurrencies()->isEmpty()) {
                 $currency->is_default = true;
@@ -271,4 +271,4 @@ class CurrencyService implements CurrencyServiceInterface
             return false;
         }
     }
-} 
+}

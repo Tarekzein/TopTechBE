@@ -1,68 +1,32 @@
 <?php
 
-namespace Modules\Store\Providers;
-
+namespace Modules\Blog\Providers;
 
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use Modules\Store\App\Console\Commands\UpdateExchangeRates;
-use Modules\Store\App\Repositories\CurrencyRepository;
-use Modules\Store\App\Repositories\SettingRepository;
-use Modules\Store\App\Services\CurrencyService;
-use Modules\Store\App\Services\SettingService;
-use Modules\Store\Interfaces\CurrencyRepositoryInterface;
-use Modules\Store\Interfaces\CurrencyServiceInterface;
-use Modules\Store\Interfaces\SettingRepositoryInterface;
-use Modules\Store\Interfaces\SettingServiceInterface;
-use Modules\Store\Models\BillingAddress;
-use Modules\Store\Models\ShippingAddress;
-use Modules\Store\Policies\BillingAddressPolicy;
-use Modules\Store\Policies\ShippingAddressPolicy;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
-class StoreServiceProvider extends ServiceProvider
+class BlogServiceProvider extends ServiceProvider
 {
     use PathNamespace;
 
-    protected string $name = 'Store';
+    protected string $name = 'Blog';
 
-    protected string $nameLower = 'store';
-
-    /**
-     * The commands to register.
-     *
-     * @var array
-     */
-    protected $commands = [
-        UpdateExchangeRates::class,
-    ];
+    protected string $nameLower = 'blog';
 
     /**
      * Boot the application events.
      */
     public function boot(): void
     {
+        $this->registerCommands();
+        $this->registerCommandSchedules();
         $this->registerTranslations();
         $this->registerConfig();
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
-        $this->registerPolicies();
-        $this->loadRoutesFrom(module_path($this->name, 'routes/api.php'));
-        $this->publishes([
-            module_path($this->name, 'config/store.php') => config_path('store.php'),
-        ], 'store-config');
-        $this->publishes([
-            module_path($this->name, 'database/migrations') => database_path('migrations'),
-        ], 'store-migrations');
-        $this->publishes([
-            module_path($this->name, 'resources/lang') => resource_path('lang/vendor/store'),
-        ], 'store-translations');
-        $this->publishes([
-            module_path($this->name, 'resources/views') => resource_path('views/vendor/store'),
-        ], 'store-views');
     }
 
     /**
@@ -72,9 +36,6 @@ class StoreServiceProvider extends ServiceProvider
     {
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
-        $this->registerCommands();
-        $this->bindRepositories();
-        $this->bindServices();
     }
 
     /**
@@ -82,7 +43,7 @@ class StoreServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        $this->commands($this->commands);
+        // $this->commands([]);
     }
 
     /**
@@ -170,26 +131,5 @@ class StoreServiceProvider extends ServiceProvider
         }
 
         return $paths;
-    }
-
-    protected function registerPolicies()
-    {
-        Gate::policy(BillingAddress::class, BillingAddressPolicy::class);
-        Gate::policy(ShippingAddress::class, ShippingAddressPolicy::class);
-    }
-
-    protected function bindRepositories()
-    {
-        $this->app->bind(CurrencyRepositoryInterface::class, CurrencyRepository::class);
-        $this->app->bind(SettingRepositoryInterface::class, SettingRepository::class);
-        $this->app->bind(OrderRepository::class, function ($app) {
-            return new OrderRepository();
-        });
-    }
-
-    protected function bindServices()
-    {
-        $this->app->bind(CurrencyServiceInterface::class, CurrencyService::class);
-        $this->app->bind(SettingServiceInterface::class, SettingService::class);
     }
 }

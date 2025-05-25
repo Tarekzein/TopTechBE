@@ -8,6 +8,7 @@ use Modules\Store\Http\Controllers\ProductAttributeController;
 use Modules\Store\Http\Controllers\ProductVariationController;
 use Modules\Store\Http\Controllers\OrderController;
 use Modules\Store\Http\Controllers\AddressController;
+use Modules\Store\Http\Controllers\PaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -148,6 +149,19 @@ Route::prefix('store')->group(function () {
             Route::get('/{key}', 'SettingController@show');
             Route::put('/{key}', 'SettingController@update');
             Route::put('/bulk-update', 'SettingController@bulkUpdate');
+        });
+    });
+
+    // Payment Routes
+    Route::prefix('payments')->group(function () {
+        Route::get('methods', [PaymentController::class, 'getAvailableMethods']);
+        Route::post('orders/{orderId}/process', [PaymentController::class, 'processPayment']);
+        Route::post('callback/{method}', [PaymentController::class, 'handleCallback']);
+        
+        // Admin routes for payment method configuration
+        Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
+            Route::get('methods/{method}/config', [PaymentController::class, 'getMethodConfig']);
+            Route::put('methods/{method}/config', [PaymentController::class, 'updateMethodConfig']);
         });
     });
 });

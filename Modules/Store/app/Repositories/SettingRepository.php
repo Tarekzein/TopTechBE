@@ -2,10 +2,11 @@
 
 namespace Modules\Store\App\Repositories;
 
-use Modules\Store\App\Models\Setting;
 use Illuminate\Database\Eloquent\Collection;
-use Modules\Store\App\Repositories\Interfaces\SettingRepositoryInterface;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Modules\Store\App\Models\Setting;
+use Modules\Store\Interfaces\SettingRepositoryInterface;
 
 class SettingRepository implements SettingRepositoryInterface
 {
@@ -62,7 +63,15 @@ class SettingRepository implements SettingRepositoryInterface
      */
     public function getByGroup(string $group): Collection
     {
-        return $this->model->where('group', $group)->get();
+        $settings = $this->model->where('group', $group)->get();
+        
+        Log::info('Getting settings by group:', [
+            'group' => $group,
+            'count' => $settings->count(),
+            'settings' => $settings->toArray()
+        ]);
+        
+        return $settings;
     }
 
     /**
@@ -86,7 +95,7 @@ class SettingRepository implements SettingRepositoryInterface
     public function getValue(string $key, ?string $locale = null)
     {
         $cacheKey = $this->getCacheKey($key, $locale);
-        
+
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($key, $locale) {
             $setting = $this->findByKey($key);
             if (!$setting) {
@@ -113,7 +122,7 @@ class SettingRepository implements SettingRepositoryInterface
         }
 
         $result = $setting->setValue($value, $locale);
-        
+
         if ($result) {
             $this->clearCache($key, $locale);
         }
@@ -157,7 +166,7 @@ class SettingRepository implements SettingRepositoryInterface
     public function getAllWithValues(?string $locale = null): Collection
     {
         $cacheKey = $this->getCacheKey('all', $locale);
-        
+
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($locale) {
             $settings = $this->model->with(['values' => function ($query) use ($locale) {
                 if ($locale) {
@@ -195,8 +204,168 @@ class SettingRepository implements SettingRepositoryInterface
     {
         // Clear specific setting cache
         Cache::forget($this->getCacheKey($key, $locale));
-        
+
         // Clear all settings cache
         Cache::forget($this->getCacheKey('all', $locale));
     }
-} 
+
+    /**
+     * Check if a setting exists by key
+     *
+     * @param string $key
+     * @return bool
+     */
+    public function exists(string $key): bool
+    {
+        $exists = $this->model->where('key', $key)->exists();
+        
+        Log::info('Checking if setting exists:', [
+            'key' => $key,
+            'exists' => $exists
+        ]);
+        
+        return $exists;
+    }
+
+    /**
+     * Update or create a setting
+     *
+     * @param string $key
+     * @param mixed $value
+     * @param string $name
+     * @param string $description
+     * @param string|null $group
+     * @param bool $isPublic
+     * @param string $type
+     * @return Setting
+     */
+    public function updateOrCreate(
+        string $key, 
+        $value, 
+        string $name, 
+        string $description, 
+        ?string $group = null, 
+        bool $isPublic = false,
+        string $type = 'string'
+    ): Setting {
+        Log::info('Updating or creating setting:', [
+            'key' => $key,
+            'value' => $value,
+            'name' => $name,
+            'description' => $description,
+            'group' => $group,
+            'type' => $type
+        ]);
+
+        try {
+            $setting = $this->model->updateOrCreate(
+                ['key' => $key],
+                [
+                    'name' => $name,
+                    'description' => $description,
+                    'group' => $group,
+                    'is_public' => $isPublic,
+                    'type' => $type,
+                    'is_required' => false,
+                    'validation_rules' => [],
+                    'options' => [],
+                    'display_order' => 0,
+                ]
+            );
+
+            // Convert value to string based on type
+            $stringValue = match ($type) {
+                'boolean' => $value ? '1' : '0',
+                'integer', 'float' => (string) ($value ?? '0'),
+                'array', 'json' => json_encode($value ?? []),
+                default => (string) ($value ?? ''),
+            };
+
+            $setting->setValue($stringValue);
+            $this->clearCache($key);
+
+            Log::info('Setting updated/created successfully:', [
+                'setting' => $setting->toArray(),
+                'value' => $stringValue
+            ]);
+
+            return $setting;
+        } catch (\Exception $e) {
+            Log::error('Failed to update/create setting:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Create a new setting
+     *
+     * @param string $key
+     * @param mixed $value
+     * @param string $name
+     * @param string $description
+     * @param string|null $group
+     * @param bool $isPublic
+     * @param string $type
+     * @return Setting
+     */
+    public function create(
+        string $key, 
+        $value, 
+        string $name, 
+        string $description, 
+        ?string $group = null, 
+        bool $isPublic = false,
+        string $type = 'string'
+    ): Setting {
+        Log::info('Creating setting:', [
+            'key' => $key,
+            'value' => $value,
+            'name' => $name,
+            'description' => $description,
+            'group' => $group,
+            'type' => $type
+        ]);
+
+        try {
+            $setting = $this->model->create([
+                'key' => $key,
+                'name' => $name,
+                'description' => $description,
+                'group' => $group,
+                'is_public' => $isPublic,
+                'type' => $type,
+                'is_required' => false,
+                'validation_rules' => [],
+                'options' => [],
+                'display_order' => 0,
+            ]);
+
+            // Convert value to string based on type
+            $stringValue = match ($type) {
+                'boolean' => $value ? '1' : '0',
+                'integer', 'float' => (string) ($value ?? '0'),
+                'array', 'json' => json_encode($value ?? []),
+                default => (string) ($value ?? ''),
+            };
+
+            $setting->setValue($stringValue);
+            $this->clearCache($key);
+
+            Log::info('Setting created successfully:', [
+                'setting' => $setting->toArray(),
+                'value' => $stringValue
+            ]);
+
+            return $setting;
+        } catch (\Exception $e) {
+            Log::error('Failed to create setting:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+}

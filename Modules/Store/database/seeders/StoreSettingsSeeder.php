@@ -2,11 +2,9 @@
 
 namespace Modules\Store\Database\Seeders;
 
+use app\Interfaces\CurrencyServiceInterface;
+use app\Interfaces\SettingServiceInterface;
 use Illuminate\Database\Seeder;
-use Modules\Store\App\Models\Setting;
-use Modules\Store\App\Models\Currency;
-use Modules\Store\App\Services\Interfaces\SettingServiceInterface;
-use Modules\Store\App\Services\Interfaces\CurrencyServiceInterface;
 
 class StoreSettingsSeeder extends Seeder
 {
@@ -279,4 +277,4 @@ class StoreSettingsSeeder extends Seeder
         $this->settingService->setSettingValue('store_status', true);
         $this->settingService->setSettingValue('store_tax_rate', 0);
     }
-} 
+}

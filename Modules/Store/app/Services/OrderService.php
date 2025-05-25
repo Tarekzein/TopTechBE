@@ -6,12 +6,20 @@ use Modules\Store\Models\Order;
 use Modules\Store\Models\OrderItem;
 use Modules\Store\Models\Cart;
 use Modules\Store\Models\CartItem;
+use Modules\Store\Repositories\OrderRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Collection;
 
 class OrderService
 {
+    protected $orderRepository;
+
+    public function __construct(OrderRepository $orderRepository)
+    {
+        $this->orderRepository = $orderRepository;
+    }
+
     /**
      * Create a new order from cart items.
      *
@@ -23,7 +31,7 @@ class OrderService
     {
         return DB::transaction(function () use ($data, $cart) {
             // Create the order
-            $order = Order::create([
+            $orderData = [
                 'order_number' => Order::generateOrderNumber(),
                 'user_id' => Auth::id(),
                 'status' => 'pending',
@@ -56,7 +64,9 @@ class OrderService
                 'shipping_country' => $data['shipping_country'] ?? $data['billing_country'],
                 'notes' => $data['notes'] ?? null,
                 'meta_data' => $data['meta_data'] ?? null,
-            ]);
+            ];
+
+            $order = $this->orderRepository->create($orderData);
 
             // Create order items from cart items
             foreach ($cart->items as $cartItem) {
@@ -108,22 +118,21 @@ class OrderService
      */
     public function updateStatus(Order $order, string $status): Order
     {
-        $order->status = $status;
+        $data = ['status' => $status];
 
         switch ($status) {
             case 'completed':
-                $order->completed_at = now();
+                $data['completed_at'] = now();
                 break;
             case 'cancelled':
-                $order->cancelled_at = now();
+                $data['cancelled_at'] = now();
                 break;
             case 'refunded':
-                $order->refunded_at = now();
+                $data['refunded_at'] = now();
                 break;
         }
 
-        $order->save();
-        return $order;
+        return $this->orderRepository->update($order, $data);
     }
 
     /**
@@ -136,17 +145,17 @@ class OrderService
      */
     public function updatePaymentStatus(Order $order, string $status, ?string $paymentId = null): Order
     {
-        $order->payment_status = $status;
+        $data = ['payment_status' => $status];
+
         if ($paymentId) {
-            $order->payment_id = $paymentId;
+            $data['payment_id'] = $paymentId;
         }
 
         if ($status === 'paid') {
-            $order->paid_at = now();
+            $data['paid_at'] = now();
         }
 
-        $order->save();
-        return $order;
+        return $this->orderRepository->update($order, $data);
     }
 
     /**
@@ -158,20 +167,19 @@ class OrderService
      */
     public function updateShippingInfo(Order $order, array $data): Order
     {
-        $order->fill([
+        $updateData = [
             'shipping_method' => $data['shipping_method'] ?? $order->shipping_method,
             'shipping_tracking_number' => $data['shipping_tracking_number'] ?? $order->shipping_tracking_number,
             'shipping_tracking_url' => $data['shipping_tracking_url'] ?? $order->shipping_tracking_url,
             'shipping_cost' => $data['shipping_cost'] ?? $order->shipping_cost,
-        ]);
+        ];
 
         // Recalculate total if shipping cost changed
         if (isset($data['shipping_cost'])) {
-            $order->total = $order->subtotal + $order->tax + $order->shipping_cost - $order->discount;
+            $updateData['total'] = $order->subtotal + $order->tax + $data['shipping_cost'] - $order->discount;
         }
 
-        $order->save();
-        return $order;
+        return $this->orderRepository->update($order, $updateData);
     }
 
     /**
@@ -182,26 +190,7 @@ class OrderService
      */
     public function getUserOrders(array $filters = []): Collection
     {
-        $query = Order::where('user_id', Auth::id())
-            ->with(['items.product', 'items.variation']);
-
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['payment_status'])) {
-            $query->where('payment_status', $filters['payment_status']);
-        }
-
-        if (isset($filters['date_from'])) {
-            $query->where('created_at', '>=', $filters['date_from']);
-        }
-
-        if (isset($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to']);
-        }
-
-        return $query->latest()->get();
+        return $this->orderRepository->getForUser(Auth::id(), $filters);
     }
 
     /**
@@ -212,10 +201,7 @@ class OrderService
      */
     public function getUserOrder(string $orderNumber): ?Order
     {
-        return Order::where('user_id', Auth::id())
-            ->where('order_number', $orderNumber)
-            ->with(['items.product', 'items.variation'])
-            ->first();
+        return $this->orderRepository->findByOrderNumberForUser($orderNumber, Auth::id());
     }
 
     /**
@@ -226,39 +212,7 @@ class OrderService
      */
     public function getAllOrders(array $filters = []): Collection
     {
-        $query = Order::with(['user', 'items.product', 'items.variation']);
-
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['payment_status'])) {
-            $query->where('payment_status', $filters['payment_status']);
-        }
-
-        if (isset($filters['user_id'])) {
-            $query->where('user_id', $filters['user_id']);
-        }
-
-        if (isset($filters['date_from'])) {
-            $query->where('created_at', '>=', $filters['date_from']);
-        }
-
-        if (isset($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to']);
-        }
-
-        if (isset($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('order_number', 'like', "%{$search}%")
-                    ->orWhere('billing_email', 'like', "%{$search}%")
-                    ->orWhere('billing_first_name', 'like', "%{$search}%")
-                    ->orWhere('billing_last_name', 'like', "%{$search}%");
-            });
-        }
-
-        return $query->latest()->get();
+        return $this->orderRepository->getAll($filters);
     }
 
     /**
@@ -269,39 +223,7 @@ class OrderService
      */
     public function getVendorOrders(array $filters = []): Collection
     {
-        $vendorId = Auth::user()->vendor->id;
-        
-        $query = Order::whereHas('items.product', function ($query) use ($vendorId) {
-            $query->where('vendor_id', $vendorId);
-        })->with(['user', 'items.product', 'items.variation']);
-
-        if (isset($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (isset($filters['payment_status'])) {
-            $query->where('payment_status', $filters['payment_status']);
-        }
-
-        if (isset($filters['date_from'])) {
-            $query->where('created_at', '>=', $filters['date_from']);
-        }
-
-        if (isset($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to']);
-        }
-
-        if (isset($filters['search'])) {
-            $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
-                $q->where('order_number', 'like', "%{$search}%")
-                    ->orWhere('billing_email', 'like', "%{$search}%")
-                    ->orWhere('billing_first_name', 'like', "%{$search}%")
-                    ->orWhere('billing_last_name', 'like', "%{$search}%");
-            });
-        }
-
-        return $query->latest()->get();
+        return $this->orderRepository->getForVendor(Auth::user()->vendor->id, $filters);
     }
 
     /**
@@ -312,14 +234,7 @@ class OrderService
      */
     public function getVendorOrder(string $orderNumber): ?Order
     {
-        $vendorId = Auth::user()->vendor->id;
-        
-        return Order::whereHas('items.product', function ($query) use ($vendorId) {
-            $query->where('vendor_id', $vendorId);
-        })
-        ->where('order_number', $orderNumber)
-        ->with(['user', 'items.product', 'items.variation'])
-        ->first();
+        return $this->orderRepository->findByOrderNumberForVendor($orderNumber, Auth::user()->vendor->id);
     }
 
     /**
@@ -334,18 +249,10 @@ class OrderService
     {
         $vendorId = Auth::user()->vendor->id;
         
-        // Verify that the order contains products from this vendor
-        $hasVendorProducts = $order->items()
-            ->whereHas('product', function ($query) use ($vendorId) {
-                $query->where('vendor_id', $vendorId);
-            })
-            ->exists();
-
-        if (!$hasVendorProducts) {
+        if (!$this->orderRepository->hasVendorProducts($order, $vendorId)) {
             throw new \Exception('This order does not contain any products from your vendor account.');
         }
 
-        // Only allow certain status transitions for vendors
         if (!in_array($status, ['pending', 'processing', 'completed', 'cancelled'])) {
             throw new \Exception('Invalid status for vendor order update.');
         }
@@ -365,14 +272,7 @@ class OrderService
     {
         $vendorId = Auth::user()->vendor->id;
         
-        // Verify that the order contains products from this vendor
-        $hasVendorProducts = $order->items()
-            ->whereHas('product', function ($query) use ($vendorId) {
-                $query->where('vendor_id', $vendorId);
-            })
-            ->exists();
-
-        if (!$hasVendorProducts) {
+        if (!$this->orderRepository->hasVendorProducts($order, $vendorId)) {
             throw new \Exception('This order does not contain any products from your vendor account.');
         }
 

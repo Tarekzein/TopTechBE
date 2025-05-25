@@ -2,5 +2,6 @@
     "Vendor": true,
     "Authentication": true,
     "User": true,
-    "Store": true
+    "Store": true,
+    "Blog": true
 }

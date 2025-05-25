@@ -2,12 +2,12 @@
 
 namespace Modules\Store\App\Services;
 
-use Modules\Store\App\Models\Setting;
+use Modules\Store\Interfaces\SettingRepositoryInterface;
+use Modules\Store\Interfaces\SettingServiceInterface;
 use Illuminate\Database\Eloquent\Collection;
-use Modules\Store\App\Services\Interfaces\SettingServiceInterface;
-use Modules\Store\App\Repositories\Interfaces\SettingRepositoryInterface;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Modules\Store\App\Models\Setting;
 
 class SettingService implements SettingServiceInterface
 {
@@ -88,7 +88,7 @@ class SettingService implements SettingServiceInterface
     public function getPublicSettings(bool $withValues = false, ?string $locale = null): Collection
     {
         $settings = $this->settingRepository->getPublic();
-        
+
         if ($withValues) {
             return $settings->map(function ($setting) use ($locale) {
                 $setting->value = $setting->getValue($locale);
@@ -110,7 +110,7 @@ class SettingService implements SettingServiceInterface
     public function getSettingsByGroup(string $group, bool $withValues = false, ?string $locale = null): Collection
     {
         $settings = $this->settingRepository->getByGroup($group);
-        
+
         if ($withValues) {
             return $settings->map(function ($setting) use ($locale) {
                 $setting->value = $setting->getValue($locale);
@@ -355,4 +355,4 @@ class SettingService implements SettingServiceInterface
     {
         return self::TYPES;
     }
-} 
+}

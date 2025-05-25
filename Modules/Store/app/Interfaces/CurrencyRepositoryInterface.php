@@ -1,9 +1,9 @@
 <?php
 
-namespace Modules\Store\App\Repositories\Interfaces;
+namespace  Modules\Store\Interfaces;
 
-use Modules\Store\App\Models\Currency;
 use Illuminate\Database\Eloquent\Collection;
+use Modules\Store\App\Models\Currency;
 
 interface CurrencyRepositoryInterface
 {
@@ -44,4 +44,4 @@ interface CurrencyRepositoryInterface
      * @return Currency|null
      */
     public function findByCode(string $code): ?Currency;
-} 
+}
