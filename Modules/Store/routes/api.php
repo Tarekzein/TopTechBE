@@ -6,6 +6,8 @@ use Modules\Store\Http\Controllers\CartController;
 use Modules\Store\Http\Controllers\WishlistController;
 use Modules\Store\Http\Controllers\ProductAttributeController;
 use Modules\Store\Http\Controllers\ProductVariationController;
+use Modules\Store\Http\Controllers\OrderController;
+use Modules\Store\Http\Controllers\AddressController;
 
 /*
 |--------------------------------------------------------------------------
@@ -95,5 +97,45 @@ Route::prefix('store')->group(function () {
         Route::delete('/items/{productId}', [WishlistController::class, 'removeItem']);
         Route::delete('/', [WishlistController::class, 'clear']);
         Route::post('/merge', [WishlistController::class, 'merge'])->middleware('auth:api');
+    });
+
+    // Order routes
+    Route::middleware(['auth:sanctum'])->group(function () {
+        // Customer routes
+        Route::prefix('orders')->group(function () {
+            Route::get('/', [OrderController::class, 'index']);
+            Route::post('/', [OrderController::class, 'store']);
+            Route::get('/{orderNumber}', [OrderController::class, 'show']);
+        });
+
+        // Admin routes
+        Route::middleware(['role:admin,super-admin'])->prefix('admin/orders')->group(function () {
+            Route::get('/', [OrderController::class, 'adminIndex']);
+            Route::patch('/{orderNumber}/status', [OrderController::class, 'updateStatus']);
+            Route::patch('/{orderNumber}/payment-status', [OrderController::class, 'updatePaymentStatus']);
+            Route::patch('/{orderNumber}/shipping', [OrderController::class, 'updateShippingInfo']);
+        });
+
+        // Vendor routes
+        Route::middleware(['role:vendor'])->prefix('vendor/orders')->group(function () {
+            Route::get('/', [OrderController::class, 'vendorIndex']);
+            Route::get('/{orderNumber}', [OrderController::class, 'vendorShow']);
+            Route::patch('/{orderNumber}/status', [OrderController::class, 'vendorUpdateStatus']);
+            Route::patch('/{orderNumber}/shipping', [OrderController::class, 'vendorUpdateShippingInfo']);
+        });
+
+        // Address Management Routes
+        Route::get('/billing-addresses', [AddressController::class, 'getBillingAddresses']);
+        Route::get('/billing-addresses/default', [AddressController::class, 'getDefaultBillingAddress']);
+        Route::post('/billing-addresses', [AddressController::class, 'createBillingAddress']);
+        Route::put('/billing-addresses/{address}', [AddressController::class, 'updateBillingAddress']);
+        Route::delete('/billing-addresses/{address}', [AddressController::class, 'deleteBillingAddress']);
+
+        // Shipping Addresses
+        Route::get('/shipping-addresses', [AddressController::class, 'getShippingAddresses']);
+        Route::get('/shipping-addresses/default', [AddressController::class, 'getDefaultShippingAddress']);
+        Route::post('/shipping-addresses', [AddressController::class, 'createShippingAddress']);
+        Route::put('/shipping-addresses/{address}', [AddressController::class, 'updateShippingAddress']);
+        Route::delete('/shipping-addresses/{address}', [AddressController::class, 'deleteShippingAddress']);
     });
 });

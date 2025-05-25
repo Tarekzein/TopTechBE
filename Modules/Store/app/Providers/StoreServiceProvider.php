@@ -7,6 +7,11 @@ use Illuminate\Support\ServiceProvider;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use Modules\Store\Policies\BillingAddressPolicy;
+use Modules\Store\Policies\ShippingAddressPolicy;
+use Modules\Store\Models\BillingAddress;
+use Modules\Store\Models\ShippingAddress;
+use Illuminate\Support\Facades\Gate;
 
 class StoreServiceProvider extends ServiceProvider
 {
@@ -27,6 +32,7 @@ class StoreServiceProvider extends ServiceProvider
         $this->registerConfig();
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
+        $this->registerPolicies();
     }
 
     /**
@@ -131,5 +137,11 @@ class StoreServiceProvider extends ServiceProvider
         }
 
         return $paths;
+    }
+
+    protected function registerPolicies()
+    {
+        Gate::policy(BillingAddress::class, BillingAddressPolicy::class);
+        Gate::policy(ShippingAddress::class, ShippingAddressPolicy::class);
     }
 }
