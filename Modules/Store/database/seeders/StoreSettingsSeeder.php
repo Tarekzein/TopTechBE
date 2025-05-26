@@ -2,8 +2,8 @@
 
 namespace Modules\Store\Database\Seeders;
 
-use app\Interfaces\CurrencyServiceInterface;
-use app\Interfaces\SettingServiceInterface;
+use Modules\Store\Interfaces\CurrencyServiceInterface;
+use Modules\Store\Interfaces\SettingServiceInterface;
 use Illuminate\Database\Seeder;
 
 class StoreSettingsSeeder extends Seeder
