@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Blog\Providers;
+namespace Modules\Blog\App\Providers;
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
@@ -16,7 +16,11 @@ class RouteServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        parent::boot();
+        $this->routes(function () {
+            Route::middleware('api')
+                ->prefix('api')
+                ->group(module_path('Blog', 'routes/api.php'));
+        });
     }
 
     /**

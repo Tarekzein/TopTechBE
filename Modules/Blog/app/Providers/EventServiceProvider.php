@@ -1,6 +1,6 @@
 <?php
 
-namespace Modules\Blog\Providers;
+namespace Modules\Blog\App\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
@@ -11,7 +11,9 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        // Define your event listeners here
+    ];
 
     /**
      * Indicates if events should be discovered.
@@ -26,5 +28,10 @@ class EventServiceProvider extends ServiceProvider
     protected function configureEmailVerification(): void
     {
         //
+    }
+
+    public function boot(): void
+    {
+        // Register any event subscribers here
     }
 }
