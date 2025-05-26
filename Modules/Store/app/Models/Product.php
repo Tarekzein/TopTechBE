@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Cviebrock\EloquentSluggable\Sluggable;
+use Modules\Vendor\Models\Vendor;
 
 class Product extends Model
 {
@@ -93,8 +94,8 @@ class Product extends Model
             return $this->variations->min('current_price');
         }
 
-        if ($this->sale_price && 
-            (!$this->sale_start || now()->gte($this->sale_start)) && 
+        if ($this->sale_price &&
+            (!$this->sale_start || now()->gte($this->sale_start)) &&
             (!$this->sale_end || now()->lte($this->sale_end))) {
             return $this->sale_price;
         }
@@ -110,8 +111,8 @@ class Product extends Model
             return $this->variations->contains('is_on_sale', true);
         }
 
-        return $this->sale_price && 
-            (!$this->sale_start || now()->gte($this->sale_start)) && 
+        return $this->sale_price &&
+            (!$this->sale_start || now()->gte($this->sale_start)) &&
             (!$this->sale_end || now()->lte($this->sale_end));
     }
 
@@ -159,4 +160,4 @@ class Product extends Model
             ]
         ];
     }
-} 
+}

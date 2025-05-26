@@ -2,6 +2,7 @@
 
 namespace Modules\Blog\App\Models;
 
+use Cviebrock\EloquentSluggable\Sluggable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Tag extends Model
 {
     use HasFactory, SoftDeletes;
-
+    use Sluggable;
     protected $table = 'blog_tags';
 
     protected $fillable = [
@@ -49,4 +50,13 @@ class Tag extends Model
             ->orderBy('posts_count', 'desc')
             ->limit($limit);
     }
-} 
+
+    public function sluggable(): array
+    {
+        return [
+            'slug' => [
+                'source' => 'name'
+            ]
+        ];
+    }
+}

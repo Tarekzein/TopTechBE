@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class BlogCategory extends Model
 {
     use HasFactory, SoftDeletes;
-
+    use \Cviebrock\EloquentSluggable\Sluggable;
     protected $table = 'blog_categories';
 
     protected $fillable = [
@@ -71,4 +71,13 @@ class BlogCategory extends Model
     {
         return $query->where('parent_id', $parentId);
     }
-} 
+
+    public function sluggable(): array
+    {
+        return [
+            'slug' => [
+                'source' => 'name'
+            ]
+        ];
+    }
+}

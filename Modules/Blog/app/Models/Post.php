@@ -2,6 +2,7 @@
 
 namespace Modules\Blog\App\Models;
 
+use Cviebrock\EloquentSluggable\Sluggable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Post extends Model
 {
     use HasFactory, SoftDeletes;
-
+    use Sluggable;
     protected $table = 'blog_posts';
 
     protected $fillable = [
@@ -89,4 +90,16 @@ class Post extends Model
     {
         $this->increment('view_count');
     }
-} 
+
+    /**
+     * Return the sluggable configuration array for this model.
+     */
+    public function sluggable(): array
+    {
+        return [
+            'slug' => [
+                'source' => 'title'
+            ]
+        ];
+    }
+}
