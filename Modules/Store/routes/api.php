@@ -44,7 +44,7 @@ Route::prefix('store')->group(function () {
         Route::get('/id/{id}', [ProductController::class, 'show'])->name('store.products.show');
 
         // Protected routes - Admin and Vendor
-        Route::middleware(['auth:sanctum', 'role:admin,super-admin,vendor'])->group(function () {
+        Route::middleware(['auth:sanctum', 'role:admin|super-admin|vendor'])->group(function () {
             Route::post('/', [ProductController::class, 'store'])->name('store.products.store');
             Route::put('/{id}', [ProductController::class, 'update'])->name('store.products.update');
             Route::delete('/{id}', [ProductController::class, 'destroy'])->name('store.products.destroy');
