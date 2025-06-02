@@ -119,4 +119,31 @@ class AuthenticationController extends Controller
             ], 500);
         }
     }
+
+    public function dashboardLogin(Request $request)
+    {
+        try {
+            $credentials = $request->validate([
+                'email' => 'required|email',
+                'password' => 'required|string',
+            ]);
+
+            $result = $this->auth_service->dashboardLogin($credentials);
+            return response()->json($result, 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (Exception $e) {
+            $statusCode = 401;
+            if (str_contains($e->getMessage(), 'not authorized')) {
+                $statusCode = 403;
+            }
+            return response()->json([
+                'message' => $e->getMessage()
+            ], $statusCode);
+        }
+    }
 }
+

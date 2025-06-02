@@ -38,4 +38,8 @@ class AuthenticationService implements AuthenticationServiceInterface
     {
         return $this->auth_repository->logout($user);
     }
+    public function dashboardLogin(array $credentials)
+    {
+        return $this->auth_repository->dashboardLogin($credentials);
+    }
 }

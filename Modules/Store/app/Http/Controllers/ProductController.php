@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Http\Controllers\Controller;
 use Modules\Store\Services\ProductService;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
@@ -64,6 +65,7 @@ class ProductController extends Controller
     public function store(Request $request): JsonResponse
     {
         try {
+            Log::info('Creating product', $request->all());
             $product = $this->productService->createProduct($request->all());
             
             return response()->json([

@@ -9,4 +9,5 @@ interface AuthenticationServiceInterface
     public function vendorRegister(array $data);
     public function login(array $credentials);
     public function logout($user);
+    public function dashboardLogin(array $credentials);
 }

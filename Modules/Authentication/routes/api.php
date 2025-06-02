@@ -18,5 +18,6 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthenticationController::class, 'register']);
     Route::post('/vendor-register', [AuthenticationController::class, 'vendorRegister']);
     Route::post('/login', [AuthenticationController::class, 'login']);
+    Route::post('/dashboard-login', [AuthenticationController::class, 'dashboardLogin']);
     Route::post('/logout', [AuthenticationController::class, 'logout'])->middleware('auth:sanctum');
 });

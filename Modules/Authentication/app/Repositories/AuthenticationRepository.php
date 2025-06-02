@@ -104,4 +104,29 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
             throw new Exception('Error during logout: ' . $e->getMessage());
         }
     }
+
+    public function dashboardLogin(array $credentials)
+    {
+        try {
+            if (!Auth::attempt($credentials)) {
+                throw new Exception('Invalid credentials');
+            }
+
+            $user = Auth::user();
+            if (!$user) {
+                throw new Exception('User not found');
+            }
+
+            $user->load('roles');
+            if (!$user->hasRole(['admin', 'super-admin'])) {
+                Auth::logout();
+                throw new Exception('You are not authorized to access this application');
+            }
+
+            $token = $user->createToken('auth_token')->plainTextToken;
+            return ['user' => $user, 'token' => $token];
+        } catch (Exception $e) {
+            throw new Exception('Error during dashboard login: ' . $e->getMessage());
+        }
+    }
 }

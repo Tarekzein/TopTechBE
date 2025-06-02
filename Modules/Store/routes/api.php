@@ -1,4 +1,6 @@
 <?php
+
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Modules\Store\Http\Controllers\CategoryController;
 use Modules\Store\Http\Controllers\ProductController;
@@ -9,7 +11,7 @@ use Modules\Store\Http\Controllers\ProductVariationController;
 use Modules\Store\Http\Controllers\OrderController;
 use Modules\Store\Http\Controllers\AddressController;
 use Modules\Store\Http\Controllers\PaymentController;
-
+use Modules\Store\Http\Controllers\SettingController;
 /*
 |--------------------------------------------------------------------------
 | Store Module API Routes
@@ -138,17 +140,17 @@ Route::prefix('store')->group(function () {
         Route::post('/shipping-addresses', [AddressController::class, 'createShippingAddress']);
         Route::put('/shipping-addresses/{address}', [AddressController::class, 'updateShippingAddress']);
         Route::delete('/shipping-addresses/{address}', [AddressController::class, 'deleteShippingAddress']);
-        
+
     });
 
     Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
         // Settings routes
         Route::prefix('settings')->group(function () {
-            Route::get('/', 'SettingController@index');
-            Route::get('/groups', 'SettingController@getGroups');
-            Route::get('/{key}', 'SettingController@show');
-            Route::put('/{key}', 'SettingController@update');
-            Route::put('/bulk-update', 'SettingController@bulkUpdate');
+            Route::get('/', [SettingController::class, 'index']);
+            Route::get('/groups', [SettingController::class, 'getGroups']);
+            Route::get('/{key}', [SettingController::class, 'show']);
+            Route::put('/{key}', [SettingController::class, 'update']);
+            Route::put('/bulk-update', [SettingController::class, 'bulkUpdate']);
         });
     });
 
@@ -157,7 +159,7 @@ Route::prefix('store')->group(function () {
         Route::get('methods', [PaymentController::class, 'getAvailableMethods']);
         Route::post('orders/{orderId}/process', [PaymentController::class, 'processPayment']);
         Route::post('callback/{method}', [PaymentController::class, 'handleCallback']);
-        
+
         // Admin routes for payment method configuration
         Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
             Route::get('methods/{method}/config', [PaymentController::class, 'getMethodConfig']);
@@ -165,3 +167,26 @@ Route::prefix('store')->group(function () {
         });
     });
 });
+
+Route::get('/debug-auth', function (Request $request) {
+    return response()->json([
+        'headers' => $request->headers->all(),
+        'authorization_header' => $request->header('Authorization'),
+        'bearer_token' => $request->bearerToken(),
+        'user' => auth('sanctum')->user(),
+        'guards' => array_keys(config('auth.guards')),
+        'sanctum_config' => config('sanctum'),
+        'app_url' => config('app.url'),
+        'session_domain' => config('session.domain'),
+    ]);
+});
+
+// Test with authentication middleware
+Route::middleware('auth:sanctum')->get('/debug-auth-protected', function (Request $request) {
+    return response()->json([
+        'message' => 'Authentication successful!',
+        'user' => $request->user(),
+        'user_id' => auth()->id(),
+    ]);
+});
+
