@@ -117,6 +117,7 @@ class CartRepository
                         'quantity' => $guestItem->quantity,
                     ]);
                 }
+                $guestItem->delete();
             }
             $guestCart->delete();
             DB::commit();

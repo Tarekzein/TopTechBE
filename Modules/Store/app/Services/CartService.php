@@ -2,8 +2,8 @@
 
 namespace Modules\Store\Services;
 
+use Modules\Store\Models\Product;
 use Modules\Store\Repositories\CartRepository;
-use Modules\Store\Entities\Product;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Exception;
@@ -70,4 +70,4 @@ class CartService
     {
         return $this->cartRepository->mergeCarts($userCart, $guestCart);
     }
-} 
+}
