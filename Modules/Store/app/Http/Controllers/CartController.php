@@ -2,8 +2,10 @@
 
 namespace Modules\Store\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use Modules\Store\Services\CartService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -43,8 +45,14 @@ class CartController extends Controller
                 'product_id' => 'required|integer',
                 'quantity' => 'required|integer|min:1',
             ]);
-            $userId = $this->getUserId();
+            $userId = $request->user()->id ?? $this->getUserId();
             $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
+            Log::info('Adding item to cart', [
+                'user_id' => $userId,
+                'guest_token' => $guestToken,
+                'product_id' => $validated['product_id'],
+                'quantity' => $validated['quantity'],
+            ]);
             if (!$userId && !$guestToken) {
                 $guestToken = Str::uuid()->toString();
             }
@@ -70,8 +78,19 @@ class CartController extends Controller
                 'product_id' => 'required|integer',
                 'quantity' => 'required|integer|min:1',
             ]);
-            $userId = $this->getUserId();
+            Log::info('Updating cart item', [
+                'product_id' => $validated['product_id'],
+                'quantity' => $validated['quantity'],
+                'headers' => $request->headers->all(),
+            ]);
+            $userId = $request->user_id ?? $this->getUserId();
             $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
+            Log::info('Updating cart item', [
+                'user_id' => $userId,
+                'guest_token' => $guestToken,
+                'product_id' => $validated['product_id'],
+                'quantity' => $validated['quantity'],
+            ]);
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
             $item = $this->cartService->updateItem($cart, $validated['product_id'], $validated['quantity']);
             return response()->json([
@@ -92,7 +111,7 @@ class CartController extends Controller
             $validated = $request->validate([
                 'product_id' => 'required|integer',
             ]);
-            $userId = $this->getUserId();
+            $userId = $request->user_id ?? $this->getUserId();
             $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
             $this->cartService->removeItem($cart, $validated['product_id']);
@@ -111,7 +130,7 @@ class CartController extends Controller
     public function clearCart(Request $request)
     {
         try {
-            $userId = $this->getUserId();
+            $userId = $request->user()->id ?? $this->getUserId();
             $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
             $this->cartService->clearCart($cart);
@@ -149,4 +168,4 @@ class CartController extends Controller
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }
     }
-} 
+}
