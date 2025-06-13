@@ -15,6 +15,7 @@ class StoreDatabaseSeeder extends Seeder
         $this->call([
             StoreSettingsSeeder::class,
             StoreCategoriesSeeder::class,
+            ProductSeeder::class,
         ]);
     }
 }

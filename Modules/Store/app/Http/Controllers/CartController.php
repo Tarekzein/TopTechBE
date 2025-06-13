@@ -45,7 +45,7 @@ class CartController extends Controller
                 'product_id' => 'required|integer',
                 'quantity' => 'required|integer|min:1',
             ]);
-            $userId = $request->user()->id ?? $this->getUserId();
+            $userId = $request->user_id?? $this->getUserId();
             $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
             Log::info('Adding item to cart', [
                 'user_id' => $userId,
@@ -65,6 +65,7 @@ class CartController extends Controller
                 'guest_token' => $guestToken,
             ], 201);
         } catch (ValidationException $e) {
+            Log::error($e);
             return response()->json(['status' => 'error', 'message' => $e->getMessage(), 'errors' => $e->errors()], 422);
         } catch (Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);

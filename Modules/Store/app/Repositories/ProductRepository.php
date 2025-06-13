@@ -17,8 +17,13 @@ class ProductRepository
     public function getAll(int $perPage = 10): LengthAwarePaginator
     {
         try {
-            return Product::with(['category', 'vendor'])
-                ->paginate($perPage);
+            return Product::with([
+                'category', 
+                'vendor',
+                'variations' => function($query) {
+                    $query->with(['images']);
+                }
+            ])->paginate($perPage);
         } catch (Exception $e) {
             Log::error('Error fetching products: ' . $e->getMessage());
             throw new Exception('Failed to fetch products');
@@ -31,8 +36,13 @@ class ProductRepository
     public function findById(int $id): ?Product
     {
         try {
-            return Product::with(['category', 'vendor'])
-                ->findOrFail($id);
+            return Product::with([
+                'category', 
+                'vendor',
+                'variations' => function($query) {
+                    $query->with(['images']);
+                }
+            ])->findOrFail($id);
         } catch (Exception $e) {
             Log::error('Error fetching product: ' . $e->getMessage());
             throw new Exception('Product not found');
@@ -105,7 +115,13 @@ class ProductRepository
     {
         try {
             return Product::where('category_id', $categoryId)
-                ->with(['category', 'vendor'])
+                ->with([
+                    'category', 
+                    'vendor',
+                    'variations' => function($query) {
+                        $query->with(['images']);
+                    }
+                ])
                 ->paginate($perPage);
         } catch (Exception $e) {
             Log::error('Error fetching products by category: ' . $e->getMessage());
@@ -120,7 +136,13 @@ class ProductRepository
     {
         try {
             return Product::where('vendor_id', $vendorId)
-                ->with(['category', 'vendor'])
+                ->with([
+                    'category', 
+                    'vendor',
+                    'variations' => function($query) {
+                        $query->with(['images']);
+                    }
+                ])
                 ->paginate($perPage);
         } catch (Exception $e) {
             Log::error('Error fetching products by vendor: ' . $e->getMessage());
@@ -135,7 +157,13 @@ class ProductRepository
     {
         try {
             return Product::where('slug', $slug)
-                ->with(['category', 'vendor'])
+                ->with([
+                    'category', 
+                    'vendor',
+                    'variations' => function($query) {
+                        $query->with(['images']);
+                    }
+                ])
                 ->firstOrFail();
         } catch (Exception $e) {
             Log::error('Error fetching product by slug: ' . $e->getMessage());
@@ -152,7 +180,13 @@ class ProductRepository
             return Product::where('name', 'like', "%{$query}%")
                 ->orWhere('description', 'like', "%{$query}%")
                 ->orWhere('sku', 'like', "%{$query}%")
-                ->with(['category', 'vendor'])
+                ->with([
+                    'category', 
+                    'vendor',
+                    'variations' => function($query) {
+                        $query->with(['images']);
+                    }
+                ])
                 ->paginate($perPage);
         } catch (Exception $e) {
             Log::error('Error searching products: ' . $e->getMessage());
