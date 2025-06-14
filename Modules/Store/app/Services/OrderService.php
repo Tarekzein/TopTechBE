@@ -10,6 +10,7 @@ use Modules\Store\Repositories\OrderRepository;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Collection;
+use Modules\Store\Models\Product;
 
 class OrderService
 {
@@ -30,82 +31,179 @@ class OrderService
     public function createFromCart(array $data, Cart $cart): Order
     {
         return DB::transaction(function () use ($data, $cart) {
-            // Create the order
-            $orderData = [
-                'order_number' => Order::generateOrderNumber(),
-                'user_id' => Auth::id(),
-                'status' => 'pending',
-                'payment_status' => 'pending',
-                'payment_method' => $data['payment_method'] ?? null,
-                'subtotal' => $cart->subtotal,
-                'tax' => $cart->tax,
-                'shipping_cost' => $data['shipping_cost'] ?? 0,
-                'discount' => $cart->discount,
-                'total' => $cart->total + ($data['shipping_cost'] ?? 0),
-                'currency' => $data['currency'] ?? config('store.currency', 'USD'),
-                'shipping_method' => $data['shipping_method'] ?? null,
-                'billing_first_name' => $data['billing_first_name'],
-                'billing_last_name' => $data['billing_last_name'],
-                'billing_email' => $data['billing_email'],
-                'billing_phone' => $data['billing_phone'],
-                'billing_address' => $data['billing_address'],
-                'billing_city' => $data['billing_city'],
-                'billing_state' => $data['billing_state'],
-                'billing_postcode' => $data['billing_postcode'],
-                'billing_country' => $data['billing_country'],
-                'shipping_first_name' => $data['shipping_first_name'] ?? $data['billing_first_name'],
-                'shipping_last_name' => $data['shipping_last_name'] ?? $data['billing_last_name'],
-                'shipping_email' => $data['shipping_email'] ?? $data['billing_email'],
-                'shipping_phone' => $data['shipping_phone'] ?? $data['billing_phone'],
-                'shipping_address' => $data['shipping_address'] ?? $data['billing_address'],
-                'shipping_city' => $data['shipping_city'] ?? $data['billing_city'],
-                'shipping_state' => $data['shipping_state'] ?? $data['billing_state'],
-                'shipping_postcode' => $data['shipping_postcode'] ?? $data['billing_postcode'],
-                'shipping_country' => $data['shipping_country'] ?? $data['billing_country'],
-                'notes' => $data['notes'] ?? null,
-                'meta_data' => $data['meta_data'] ?? null,
-            ];
+            try {
+                // Load cart items with their products
+                $cart->load(['items.product']);
 
-            $order = $this->orderRepository->create($orderData);
+                // Create a map of product prices from meta_data
+                $metaPrices = collect($data['meta_data']['cart_items'])->keyBy('product_id')
+                    ->map(function ($item) {
+                        return [
+                            'price' => (float) $item['price'],
+                            'quantity' => (int) $item['quantity']
+                        ];
+                    });
 
-            // Create order items from cart items
-            foreach ($cart->items as $cartItem) {
-                $this->createOrderItem($order, $cartItem);
+                // Calculate totals using the prices from meta_data
+                $cartItems = $cart->items->map(function ($item) use ($metaPrices) {
+                    $metaItem = $metaPrices->get($item->product_id);
+                    if (!$metaItem) {
+                        throw new \Exception(sprintf(
+                            'Product ID %d not found in meta_data',
+                            $item->product_id
+                        ));
+                    }
+
+                    return [
+                        'product_id' => $item->product_id,
+                        'quantity' => $metaItem['quantity'],
+                        'price' => $metaItem['price'],
+                        'subtotal' => round($metaItem['price'] * $metaItem['quantity'], 2)
+                    ];
+                });
+
+                $cartSubtotal = $cartItems->sum('subtotal');
+                $cartTax = round($cartSubtotal * 0.07, 2); // 7% tax
+                $shippingCost = round($data['shipping_cost'] ?? 0, 2);
+                $cartTotal = round($cartSubtotal + $cartTax + $shippingCost, 2);
+
+                // Log the values for debugging
+                \Log::info('Order totals calculation', [
+                    'cart_subtotal' => $cartSubtotal,
+                    'provided_subtotal' => $data['subtotal'],
+                    'cart_tax' => $cartTax,
+                    'provided_tax' => $data['tax'],
+                    'shipping_cost' => $shippingCost,
+                    'cart_total' => $cartTotal,
+                    'provided_total' => $data['total'],
+                    'cart_items' => $cartItems->toArray(),
+                    'meta_prices' => $metaPrices->toArray()
+                ]);
+
+                // Validate totals with a small tolerance for floating point arithmetic
+                if (abs($cartSubtotal - $data['subtotal']) > 0.01) {
+                    throw new \Exception(sprintf(
+                        'Cart subtotal (%.2f) does not match provided subtotal (%.2f). Please refresh the page and try again.',
+                        $cartSubtotal,
+                        $data['subtotal']
+                    ));
+                }
+
+                if (abs($cartTax - $data['tax']) > 0.01) {
+                    throw new \Exception(sprintf(
+                        'Cart tax (%.2f) does not match provided tax (%.2f). Please refresh the page and try again.',
+                        $cartTax,
+                        $data['tax']
+                    ));
+                }
+
+                if (abs($cartTotal - $data['total']) > 0.01) {
+                    throw new \Exception(sprintf(
+                        'Cart total (%.2f) does not match provided total (%.2f). Please refresh the page and try again.',
+                        $cartTotal,
+                        $data['total']
+                    ));
+                }
+
+                // Create the order with validated data
+                $order = $this->orderRepository->create([
+                    'order_number' => Order::generateOrderNumber(),
+                    'user_id' => $cart->user_id,
+                    'status' => 'pending',
+                    'payment_status' => 'pending',
+                    'payment_method' => $data['payment_method'],
+                    'shipping_method' => $data['shipping_method'],
+                    'shipping_cost' => $shippingCost,
+                    'subtotal' => $cartSubtotal,
+                    'tax' => $cartTax,
+                    'total' => $cartTotal,
+                    'currency' => $data['currency'] ?? 'USD',
+                    'billing_address_id' => $data['billing_address_id'],
+                    'shipping_address_id' => $data['shipping_address_id'],
+                    'notes' => $data['notes'] ?? null,
+                    'meta_data' => [
+                        'cart_items' => $cartItems->toArray(),
+                        'original_cart' => $cart->toArray(),
+                        'meta_prices' => $metaPrices->toArray()
+                    ]
+                ]);
+
+                // Create order items using the validated cart items
+                foreach ($cartItems as $item) {
+                    $this->createOrderItem($order, [
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'price' => $item['price'],
+                        'attributes' => $cart->items->firstWhere('product_id', $item['product_id'])->attributes ?? []
+                    ]);
+                }
+
+                // Clear the cart after successful order creation
+                $cart->items()->delete();
+
+                return $order;
+            } catch (\Exception $e) {
+                \Log::error('Failed to create order', [
+                    'cart_id' => $cart->id,
+                    'user_id' => $cart->user_id,
+                    'data' => $data,
+                    'exception' => $e
+                ]);
+                throw $e;
             }
-
-            // Clear the cart
-            $cart->items()->delete();
-            $cart->delete();
-
-            return $order->load('items');
         });
     }
 
     /**
-     * Create an order item from a cart item.
+     * Create an order item with validated data.
      *
      * @param Order $order
-     * @param CartItem $cartItem
+     * @param array $itemData
      * @return OrderItem
      */
-    protected function createOrderItem(Order $order, CartItem $cartItem): OrderItem
+    protected function createOrderItem(Order $order, array $itemData): OrderItem
     {
-        $product = $cartItem->product;
-        $variation = $cartItem->variation;
+        // Get the product to ensure we have all required information
+        $product = Product::findOrFail($itemData['product_id']);
 
-        return OrderItem::create([
-            'order_id' => $order->id,
-            'product_id' => $product->id,
-            'variation_id' => $variation?->id,
-            'name' => $variation ? $variation->name : $product->name,
-            'sku' => $variation ? $variation->sku : $product->sku,
-            'quantity' => $cartItem->quantity,
-            'price' => $cartItem->price,
-            'subtotal' => $cartItem->subtotal,
-            'tax' => $cartItem->tax,
-            'total' => $cartItem->total,
-            'attributes' => $cartItem->attributes,
-            'meta_data' => $cartItem->meta_data,
+        // Validate required fields
+        if (empty($itemData['product_id']) || empty($itemData['quantity']) || empty($itemData['price'])) {
+            throw new \Exception('Missing required field for order item: ' . 
+                (empty($itemData['product_id']) ? 'product_id' : 
+                (empty($itemData['quantity']) ? 'quantity' : 'price')));
+        }
+
+        // Calculate item totals
+        $subtotal = round($itemData['price'] * $itemData['quantity'], 2);
+        $tax = round($subtotal * 0.07, 2); // 7% tax
+        $total = round($subtotal + $tax, 2);
+
+        // Create the order item with all required fields
+        return $order->items()->create([
+            'product_id' => $itemData['product_id'],
+            'variation_id' => $itemData['variation_id'] ?? null,
+            'name' => $product->name,
+            'sku' => $product->sku,
+            'quantity' => $itemData['quantity'],
+            'price' => $itemData['price'],
+            'subtotal' => $subtotal,
+            'tax' => $tax,
+            'total' => $total,
+            'attributes' => $itemData['attributes'] ?? [],
+            'meta_data' => [
+                'product' => [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'sku' => $product->sku,
+                    'price' => $product->price,
+                    'sale_price' => $product->sale_price,
+                    'image' => $product->images[0] ?? null
+                ],
+                'variation' => isset($itemData['variation_id']) ? [
+                    'id' => $itemData['variation_id'],
+                    'sku' => $product->variations->firstWhere('id', $itemData['variation_id'])?->sku
+                ] : null
+            ]
         ]);
     }
 

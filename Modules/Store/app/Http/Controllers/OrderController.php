@@ -10,6 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Modules\Store\Models\BillingAddress;
+use Modules\Store\Models\ShippingAddress;
 
 class OrderController extends Controller
 {
@@ -32,35 +34,68 @@ class OrderController extends Controller
             'payment_method' => 'required|string',
             'shipping_method' => 'required|string',
             'shipping_cost' => 'required|numeric|min:0',
-            'billing_first_name' => 'required|string|max:255',
-            'billing_last_name' => 'required|string|max:255',
-            'billing_email' => 'required|email|max:255',
-            'billing_phone' => 'required|string|max:20',
-            'billing_address' => 'required|string|max:255',
-            'billing_city' => 'required|string|max:255',
-            'billing_state' => 'required|string|max:255',
-            'billing_postcode' => 'required|string|max:20',
-            'billing_country' => 'required|string|max:2',
-            'shipping_first_name' => 'nullable|string|max:255',
-            'shipping_last_name' => 'nullable|string|max:255',
-            'shipping_email' => 'nullable|email|max:255',
-            'shipping_phone' => 'nullable|string|max:20',
-            'shipping_address' => 'nullable|string|max:255',
-            'shipping_city' => 'nullable|string|max:255',
-            'shipping_state' => 'nullable|string|max:255',
-            'shipping_postcode' => 'nullable|string|max:20',
-            'shipping_country' => 'nullable|string|max:2',
+            'subtotal' => 'required|numeric|min:0',
+            'tax' => 'required|numeric|min:0',
+            'total' => 'required|numeric|min:0',
+            'billing_address_id' => 'required|exists:billing_addresses,id',
+            'shipping_address_id' => 'required|exists:shipping_addresses,id',
             'notes' => 'nullable|string',
+            'meta_data' => 'nullable|array',
+            'meta_data.cart_items' => 'required|array',
+            'meta_data.cart_items.*.product_id' => 'required|integer',
+            'meta_data.cart_items.*.quantity' => 'required|integer|min:1',
+            'meta_data.cart_items.*.price' => 'required|numeric|min:0',
+            'meta_data.cart_items.*.variation_id' => 'nullable|integer',
+            'meta_data.cart_items.*.attributes' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Verify that the addresses belong to the authenticated user
+        $billingAddress = BillingAddress::where('id', $request->billing_address_id)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        $shippingAddress = ShippingAddress::where('id', $request->shipping_address_id)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (!$billingAddress) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => ['billing_address_id' => ['The selected billing address is invalid.']]
+            ], 422);
+        }
+
+        if (!$shippingAddress) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => ['shipping_address_id' => ['The selected shipping address is invalid.']]
+            ], 422);
         }
 
         $cart = Cart::where('user_id', Auth::id())->first();
 
         if (!$cart || $cart->items->isEmpty()) {
             return response()->json(['message' => 'Cart is empty'], 400);
+        }
+
+        // Validate that the totals match
+        $calculatedSubtotal = collect($request->meta_data['cart_items'])->sum(function ($item) {
+            return $item['price'] * $item['quantity'];
+        });
+        
+        if (abs($calculatedSubtotal - $request->subtotal) > 0.01) {
+            return response()->json([
+                'message' => 'Subtotal does not match cart items total',
+                'calculated' => $calculatedSubtotal,
+                'provided' => $request->subtotal
+            ], 422);
         }
 
         try {

@@ -16,7 +16,49 @@ class OrderRepository
      */
     public function create(array $data): Order
     {
-        return Order::create($data);
+        // Validate required fields
+        $requiredFields = [
+            'order_number',
+            'user_id',
+            'status',
+            'payment_status',
+            'payment_method',
+            'subtotal',
+            'tax',
+            'shipping_cost',
+            'total',
+            'currency',
+            'shipping_method'
+        ];
+
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || $data[$field] === null) {
+                throw new \Exception("Missing required field for order: {$field}");
+            }
+        }
+
+        // Ensure numeric values are properly formatted
+        $numericFields = ['subtotal', 'tax', 'shipping_cost', 'discount', 'total'];
+        foreach ($numericFields as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = round((float) $data[$field], 2);
+            }
+        }
+
+        // Ensure meta_data is properly formatted
+        if (isset($data['meta_data']) && !is_array($data['meta_data'])) {
+            $data['meta_data'] = json_decode($data['meta_data'], true) ?? [];
+        }
+
+        try {
+            return Order::create($data);
+        } catch (\Exception $e) {
+            \Log::error('Failed to create order: ' . $e->getMessage(), [
+                'data' => $data,
+                'exception' => $e
+            ]);
+            throw new \Exception('Failed to create order: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -137,9 +179,30 @@ class OrderRepository
      */
     public function update(Order $order, array $data): Order
     {
-        $order->fill($data);
-        $order->save();
-        return $order;
+        // Ensure numeric values are properly formatted
+        $numericFields = ['subtotal', 'tax', 'shipping_cost', 'discount', 'total'];
+        foreach ($numericFields as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = round((float) $data[$field], 2);
+            }
+        }
+
+        // Ensure meta_data is properly formatted
+        if (isset($data['meta_data']) && !is_array($data['meta_data'])) {
+            $data['meta_data'] = json_decode($data['meta_data'], true) ?? $order->meta_data;
+        }
+
+        try {
+            $order->update($data);
+            return $order->fresh();
+        } catch (\Exception $e) {
+            \Log::error('Failed to update order: ' . $e->getMessage(), [
+                'order_id' => $order->id,
+                'data' => $data,
+                'exception' => $e
+            ]);
+            throw new \Exception('Failed to update order: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -159,26 +222,29 @@ class OrderRepository
             $query->where('payment_status', $filters['payment_status']);
         }
 
-        if (isset($filters['user_id'])) {
-            $query->where('user_id', $filters['user_id']);
-        }
-
         if (isset($filters['date_from'])) {
-            $query->where('created_at', '>=', $filters['date_from']);
+            $query->whereDate('created_at', '>=', $filters['date_from']);
         }
 
         if (isset($filters['date_to'])) {
-            $query->where('created_at', '<=', $filters['date_to']);
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        if (isset($filters['user_id'])) {
+            $query->where('user_id', $filters['user_id']);
         }
 
         if (isset($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('order_number', 'like', "%{$search}%")
-                    ->orWhere('billing_email', 'like', "%{$search}%")
-                    ->orWhere('billing_first_name', 'like', "%{$search}%")
-                    ->orWhere('billing_last_name', 'like', "%{$search}%");
+                  ->orWhere('billing_email', 'like', "%{$search}%")
+                  ->orWhere('billing_first_name', 'like', "%{$search}%")
+                  ->orWhere('billing_last_name', 'like', "%{$search}%");
             });
         }
+
+        // Always order by most recent first
+        $query->latest();
     }
 } 
