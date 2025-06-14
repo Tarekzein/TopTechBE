@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
 
 class ProductVariation extends Model
 {
@@ -94,19 +95,33 @@ class ProductVariation extends Model
      */
     public function getFormattedAttributesAttribute()
     {
-        if (!$this->attributes['attributes']) {
+        if (empty($this->attributes['attributes'])) {
             return [];
         }
 
-        $formatted = [];
-        foreach ($this->attributes['attributes'] as $attributeId => $valueId) {
-            $attribute = ProductAttribute::with('values')->find($attributeId);
-            $value = $attribute->values->firstWhere('id', $valueId);
-            
-            if ($attribute && $value) {
-                $formatted[$attribute->name] = $value->value;
-            }
+        $formatted = ['attributes' => []];
+        // Ensure we're working with an array
+        $attributes = is_string($this->attributes['attributes']) 
+            ? json_decode($this->attributes['attributes'], true) 
+            : $this->attributes['attributes'];
+
+        if (!is_array($attributes)) {
+            return [];
         }
+
+        foreach ($attributes['attributes'] as $attributeId => $valueId) {
+            $attribute = ProductAttribute::with('values')->find($attributeId);
+            if (!$attribute) {
+                continue;
+            }
+            Log::info($attribute);
+            $value = $attribute->values->firstWhere('id', $valueId);
+            if ($value) {
+                $formatted['attributes'][$attribute->name] = $value->value;
+            }
+            Log::info($value);
+        }
+        Log::info($formatted);
         return $formatted;
     }
 } 

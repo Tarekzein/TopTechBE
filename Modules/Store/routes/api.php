@@ -127,19 +127,22 @@ Route::prefix('store')->group(function () {
             Route::patch('/{orderNumber}/shipping', [OrderController::class, 'vendorUpdateShippingInfo']);
         });
 
-        // Address Management Routes
-        Route::get('/billing-addresses', [AddressController::class, 'getBillingAddresses']);
-        Route::get('/billing-addresses/default', [AddressController::class, 'getDefaultBillingAddress']);
-        Route::post('/billing-addresses', [AddressController::class, 'createBillingAddress']);
-        Route::put('/billing-addresses/{address}', [AddressController::class, 'updateBillingAddress']);
-        Route::delete('/billing-addresses/{address}', [AddressController::class, 'deleteBillingAddress']);
+        Route::group(['prefix' => 'addresses'], function () {
+            // Address Management Routes
+            Route::get('/billing', [AddressController::class, 'getBillingAddresses']);
+            Route::get('/billing/default', [AddressController::class, 'getDefaultBillingAddress']);
+            Route::post('/billing', [AddressController::class, 'createBillingAddress']);
+            Route::put('/billing/{address}', [AddressController::class, 'updateBillingAddress']);
+            Route::delete('/billing/{address}', [AddressController::class, 'deleteBillingAddress']);
 
-        // Shipping Addresses
-        Route::get('/shipping-addresses', [AddressController::class, 'getShippingAddresses']);
-        Route::get('/shipping-addresses/default', [AddressController::class, 'getDefaultShippingAddress']);
-        Route::post('/shipping-addresses', [AddressController::class, 'createShippingAddress']);
-        Route::put('/shipping-addresses/{address}', [AddressController::class, 'updateShippingAddress']);
-        Route::delete('/shipping-addresses/{address}', [AddressController::class, 'deleteShippingAddress']);
+            // Shipping Addresses
+            Route::get('/shipping', [AddressController::class, 'getShippingAddresses']);
+            Route::get('/shipping/default', [AddressController::class, 'getDefaultShippingAddress']);
+            Route::post('/shipping', [AddressController::class, 'createShippingAddress']);
+            Route::put('/shipping/{address}', [AddressController::class, 'updateShippingAddress']);
+            Route::delete('/shipping/{address}', [AddressController::class, 'deleteShippingAddress']);
+        });
+
 
     });
 

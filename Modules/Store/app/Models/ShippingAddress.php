@@ -2,6 +2,7 @@
 
 namespace Modules\Store\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -57,4 +58,4 @@ class ShippingAddress extends Model
 
         return implode(', ', array_filter($parts));
     }
-} 
+}

@@ -103,8 +103,6 @@ class AddressController extends Controller
      */
     public function updateBillingAddress(Request $request, BillingAddress $address): JsonResponse
     {
-        $this->authorize('update', $address);
-
         $validated = $request->validate([
             'first_name' => 'sometimes|required|string|max:255',
             'last_name' => 'sometimes|required|string|max:255',
@@ -132,8 +130,6 @@ class AddressController extends Controller
      */
     public function updateShippingAddress(Request $request, ShippingAddress $address): JsonResponse
     {
-        $this->authorize('update', $address);
-
         $validated = $request->validate([
             'first_name' => 'sometimes|required|string|max:255',
             'last_name' => 'sometimes|required|string|max:255',
@@ -160,7 +156,6 @@ class AddressController extends Controller
      */
     public function deleteBillingAddress(BillingAddress $address): JsonResponse
     {
-        $this->authorize('delete', $address);
 
         $this->addressService->deleteBillingAddress($address);
         return response()->json(null, 204);
@@ -174,7 +169,6 @@ class AddressController extends Controller
      */
     public function deleteShippingAddress(ShippingAddress $address): JsonResponse
     {
-        $this->authorize('delete', $address);
 
         $this->addressService->deleteShippingAddress($address);
         return response()->json(null, 204);
@@ -201,4 +195,4 @@ class AddressController extends Controller
         $address = $this->addressService->getDefaultShippingAddress();
         return response()->json(new JsonResource($address));
     }
-} 
+}

@@ -17,13 +17,19 @@ class ProductRepository
     public function getAll(int $perPage = 10): LengthAwarePaginator
     {
         try {
-            return Product::with([
+            $products = Product::with([
                 'category', 
                 'vendor',
                 'variations' => function($query) {
                     $query->with(['images']);
                 }
             ])->paginate($perPage);
+            $products->each(function($product) {
+                $product->variations->each(function($variation) {
+                    $variation->attributes=$variation->getFormattedAttributesAttribute();
+                });
+            });
+            return $products;
         } catch (Exception $e) {
             Log::error('Error fetching products: ' . $e->getMessage());
             throw new Exception('Failed to fetch products');
@@ -36,13 +42,17 @@ class ProductRepository
     public function findById(int $id): ?Product
     {
         try {
-            return Product::with([
+            $product = Product::with([
                 'category', 
                 'vendor',
                 'variations' => function($query) {
                     $query->with(['images']);
                 }
             ])->findOrFail($id);
+            $product->variations->each(function($variation) {
+                $variation->attributes=$variation->getFormattedAttributesAttribute();
+            });
+            return $product;
         } catch (Exception $e) {
             Log::error('Error fetching product: ' . $e->getMessage());
             throw new Exception('Product not found');
@@ -114,7 +124,7 @@ class ProductRepository
     public function getByCategory(int $categoryId, int $perPage = 10): LengthAwarePaginator
     {
         try {
-            return Product::where('category_id', $categoryId)
+            $products = Product::where('category_id', $categoryId)
                 ->with([
                     'category', 
                     'vendor',
@@ -123,6 +133,12 @@ class ProductRepository
                     }
                 ])
                 ->paginate($perPage);
+            $products->each(function($product) {
+                $product->variations->each(function($variation) {
+                    $variation->attributes=$variation->getFormattedAttributesAttribute();
+                });
+            });
+            return $products;
         } catch (Exception $e) {
             Log::error('Error fetching products by category: ' . $e->getMessage());
             throw new Exception('Failed to fetch products by category');
@@ -135,7 +151,7 @@ class ProductRepository
     public function getByVendor(int $vendorId, int $perPage = 10): LengthAwarePaginator
     {
         try {
-            return Product::where('vendor_id', $vendorId)
+            $products = Product::where('vendor_id', $vendorId)
                 ->with([
                     'category', 
                     'vendor',
@@ -144,6 +160,12 @@ class ProductRepository
                     }
                 ])
                 ->paginate($perPage);
+            $products->each(function($product) {
+                $product->variations->each(function($variation) {
+                    $variation->attributes=$variation->getFormattedAttributesAttribute();
+                });
+            });
+            return $products;
         } catch (Exception $e) {
             Log::error('Error fetching products by vendor: ' . $e->getMessage());
             throw new Exception('Failed to fetch products by vendor');
@@ -156,7 +178,7 @@ class ProductRepository
     public function findBySlug(string $slug): ?Product
     {
         try {
-            return Product::where('slug', $slug)
+            $product = Product::where('slug', $slug)
                 ->with([
                     'category', 
                     'vendor',
@@ -165,7 +187,12 @@ class ProductRepository
                     }
                 ])
                 ->firstOrFail();
+            $product->variations->each(function($variation) {
+                $variation->attributes=$variation->getFormattedAttributesAttribute();
+            });
+            return $product;
         } catch (Exception $e) {
+            Log::info($e);
             Log::error('Error fetching product by slug: ' . $e->getMessage());
             throw new Exception('Product not found');
         }
@@ -177,7 +204,7 @@ class ProductRepository
     public function search(string $query, int $perPage = 10): LengthAwarePaginator
     {
         try {
-            return Product::where('name', 'like', "%{$query}%")
+            $products = Product::where('name', 'like', "%{$query}%")
                 ->orWhere('description', 'like', "%{$query}%")
                 ->orWhere('sku', 'like', "%{$query}%")
                 ->with([
@@ -188,6 +215,12 @@ class ProductRepository
                     }
                 ])
                 ->paginate($perPage);
+            $products->each(function($product) {
+                $product->variations->each(function($variation) {
+                    $variation->attributes=$variation->getFormattedAttributesAttribute();
+                });
+            });
+            return $products;
         } catch (Exception $e) {
             Log::error('Error searching products: ' . $e->getMessage());
             throw new Exception('Failed to search products');
