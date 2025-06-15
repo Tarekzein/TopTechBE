@@ -5,14 +5,14 @@ namespace Modules\Blog\App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Modules\Blog\App\Services\Interfaces\BlogCategoryServiceInterface;
+use Modules\Blog\App\Services\Interfaces\CategoryServiceInterface;
 use Modules\Blog\App\Http\Requests\BlogCategoryRequest;
 
 class BlogCategoryController extends Controller
 {
-    protected BlogCategoryServiceInterface $categoryService;
+    protected CategoryServiceInterface $categoryService;
 
-    public function __construct(BlogCategoryServiceInterface $categoryService)
+    public function __construct(CategoryServiceInterface $categoryService)
     {
         $this->categoryService = $categoryService;
     }
@@ -124,4 +124,4 @@ class BlogCategoryController extends Controller
         }
         return response()->json(['message' => 'Category moved successfully']);
     }
-} 
+}

@@ -5,7 +5,7 @@ namespace Modules\Blog\App\Services\Interfaces;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 
-interface BlogCategoryServiceInterface extends BaseServiceInterface
+interface CategoryServiceInterface extends BaseServiceInterface
 {
     public function getActiveCategories(): Collection;
     public function getCategoryTree(): Collection;
@@ -17,4 +17,4 @@ interface BlogCategoryServiceInterface extends BaseServiceInterface
     public function toggleActive(int $id): bool;
     public function updateOrder(array $orderData): bool;
     public function moveCategory(int $id, ?int $newParentId): bool;
-} 
+}

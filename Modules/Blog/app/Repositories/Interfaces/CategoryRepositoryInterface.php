@@ -5,7 +5,7 @@ namespace Modules\Blog\App\Repositories\Interfaces;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 
-interface BlogCategoryRepositoryInterface extends BaseRepositoryInterface
+interface CategoryRepositoryInterface extends BaseRepositoryInterface
 {
     public function getActiveCategories(): Collection;
     public function getCategoryTree(): Collection;
@@ -14,4 +14,4 @@ interface BlogCategoryRepositoryInterface extends BaseRepositoryInterface
     public function getCategoriesWithPostCount(): Collection;
     public function getParentCategories(): Collection;
     public function getChildCategories(int $parentId): Collection;
-} 
+}

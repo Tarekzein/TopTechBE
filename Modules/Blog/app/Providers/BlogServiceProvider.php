@@ -16,7 +16,7 @@ use Modules\Blog\App\Repositories\BlogCategoryRepository;
 use Modules\Blog\App\Repositories\TagRepository;
 use Modules\Blog\App\Repositories\CommentRepository;
 use Modules\Blog\App\Services\Interfaces\PostServiceInterface;
-use Modules\Blog\App\Services\Interfaces\BlogCategoryServiceInterface;
+use Modules\Blog\App\Services\Interfaces\CategoryServiceInterface;
 use Modules\Blog\App\Services\Interfaces\TagServiceInterface;
 use Modules\Blog\App\Services\Interfaces\CommentServiceInterface;
 use Modules\Blog\App\Services\PostService;
@@ -61,7 +61,7 @@ class BlogServiceProvider extends ServiceProvider
 
         // Register Services
         $this->app->bind(PostServiceInterface::class, PostService::class);
-        $this->app->bind(BlogCategoryServiceInterface::class, BlogCategoryService::class);
+        $this->app->bind(CategoryServiceInterface::class, BlogCategoryService::class);
         $this->app->bind(TagServiceInterface::class, TagService::class);
         $this->app->bind(CommentServiceInterface::class, CommentService::class);
     }

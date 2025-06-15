@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Blog\App\Repositories\Interfaces\BlogCategoryRepositoryInterface;
-use Modules\Blog\App\Services\Interfaces\BlogCategoryServiceInterface;
+use Modules\Blog\App\Services\Interfaces\CategoryServiceInterface;
 
-class BlogCategoryService implements BlogCategoryServiceInterface
+class BlogCategoryService implements CategoryServiceInterface
 {
     protected BlogCategoryRepositoryInterface $categoryRepository;
 
@@ -128,4 +128,4 @@ class BlogCategoryService implements BlogCategoryServiceInterface
     {
         return $this->categoryRepository->forceDelete($id);
     }
-} 
+}
