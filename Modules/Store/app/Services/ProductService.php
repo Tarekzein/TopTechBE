@@ -43,11 +43,11 @@ class ProductService
     }
 
     /**
-     * Get all products
+     * Get all products with filters
      */
-    public function getAllProducts(int $perPage = 10)
+    public function getAllProducts(int $perPage = 10, array $filters = [])
     {
-        return $this->productRepository->getAll($perPage);
+        return $this->productRepository->getAll($perPage, $filters);
     }
 
     /**

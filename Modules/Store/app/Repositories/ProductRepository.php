@@ -12,23 +12,74 @@ use Illuminate\Pagination\LengthAwarePaginator;
 class ProductRepository
 {
     /**
-     * Get all products with pagination
+     * Get all products with pagination and filters
      */
-    public function getAll(int $perPage = 10): LengthAwarePaginator
+    public function getAll(int $perPage = 10, array $filters = []): LengthAwarePaginator
     {
         try {
-            $products = Product::with([
+            $query = Product::with([
                 'category', 
                 'vendor',
                 'variations' => function($query) {
                     $query->with(['images']);
                 }
-            ])->paginate($perPage);
+            ]);
+
+            // Apply category filter
+            if (!empty($filters['category_id'])) {
+                $query->where('category_id', $filters['category_id']);
+            }
+
+            // Apply vendor filter
+            if (!empty($filters['vendor_id'])) {
+                $query->where('vendor_id', $filters['vendor_id']);
+            }
+
+            // Apply price range filter
+            if (!empty($filters['price_min'])) {
+                $query->where(function($q) use ($filters) {
+                    $q->where('price', '>=', $filters['price_min'])
+                      ->orWhereHas('variations', function($q) use ($filters) {
+                          $q->where('price', '>=', $filters['price_min']);
+                      });
+                });
+            }
+            if (!empty($filters['price_max'])) {
+                $query->where(function($q) use ($filters) {
+                    $q->where('price', '<=', $filters['price_max'])
+                      ->orWhereHas('variations', function($q) use ($filters) {
+                          $q->where('price', '<=', $filters['price_max']);
+                      });
+                });
+            }
+
+            // Apply attribute filters (color, size)
+            if (!empty($filters['color']) || !empty($filters['size'])) {
+                $query->whereHas('variations', function($q) use ($filters) {
+                    if (!empty($filters['color'])) {
+                        $q->whereHas('attributes', function($q) use ($filters) {
+                            $q->where('type', 'color')
+                              ->where('value', $filters['color']);
+                        });
+                    }
+                    if (!empty($filters['size'])) {
+                        $q->whereHas('attributes', function($q) use ($filters) {
+                            $q->where('type', 'size')
+                              ->where('value', $filters['size']);
+                        });
+                    }
+                });
+            }
+
+            $products = $query->paginate($perPage);
+            
+            // Format variations with attributes
             $products->each(function($product) {
                 $product->variations->each(function($variation) {
-                    $variation->attributes=$variation->getFormattedAttributesAttribute();
+                    $variation->attributes = $variation->getFormattedAttributesAttribute();
                 });
             });
+
             return $products;
         } catch (Exception $e) {
             Log::error('Error fetching products: ' . $e->getMessage());

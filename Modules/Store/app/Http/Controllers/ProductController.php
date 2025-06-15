@@ -19,13 +19,29 @@ class ProductController extends Controller
     }
 
     /**
-     * Get all products
+     * Get all products with filters
      */
     public function index(Request $request): JsonResponse
     {
         try {
             $perPage = $request->input('per_page', 10);
-            $products = $this->productService->getAllProducts($perPage);
+            
+            // Get filter parameters
+            $filters = [
+                'category_id' => $request->input('category_id'),
+                'vendor_id' => $request->input('vendor_id'),
+                'price_min' => $request->input('price_min'),
+                'price_max' => $request->input('price_max'),
+                'color' => $request->input('color'),
+                'size' => $request->input('size'),
+            ];
+
+            // Remove empty filters
+            $filters = array_filter($filters, function($value) {
+                return $value !== null && $value !== '';
+            });
+
+            $products = $this->productService->getAllProducts($perPage, $filters);
             
             return response()->json([
                 'status' => 'success',
