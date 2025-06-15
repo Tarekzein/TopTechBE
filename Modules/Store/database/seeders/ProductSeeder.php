@@ -76,7 +76,7 @@ class ProductSeeder extends Seeder
                 'images' => [$faker->imageUrl(640, 480, 'technics')],
                 'is_active' => true,
                 'category_id' => 1,
-                'vendor_id' => 1,
+                'vendor_id' => 2,
                 'weight' => $faker->randomFloat(2, 0.2, 2),
                 'weight_unit' => 'kg',
                 'length' => rand(10, 50),
