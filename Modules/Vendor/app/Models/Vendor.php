@@ -5,6 +5,7 @@ namespace Modules\Vendor\Models;
 use Cviebrock\EloquentSluggable\Sluggable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\User;
 // use Modules\Vendor\Database\Factories\VendorFactory;
 
 class Vendor extends Model
@@ -51,5 +52,10 @@ class Vendor extends Model
     public function getComponent($name)
     {
         return $this->components()->where('name', $name)->first();
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

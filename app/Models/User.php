@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Cviebrock\EloquentSluggable\Sluggable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Modules\Vendor\Models\Vendor;
 
 class User extends Authenticatable
 {
@@ -59,5 +60,10 @@ class User extends Authenticatable
                 'source' => 'first_name'
             ]
         ];
+    }
+
+    public function vendor()
+    {
+        return $this->hasOne(Vendor::class);
     }
 }

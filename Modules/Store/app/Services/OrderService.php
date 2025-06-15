@@ -317,11 +317,67 @@ class OrderService
      * Get all orders for the authenticated vendor.
      *
      * @param array $filters
-     * @return Collection
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     * @throws \Exception
      */
-    public function getVendorOrders(array $filters = []): Collection
+    public function getVendorOrders(array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
-        return $this->orderRepository->getForVendor(Auth::user()->vendor->id, $filters);
+        $user = Auth::user();
+        
+        if (!$user) {
+            throw new \Exception('User not authenticated.');
+        }
+
+        if (!$user->vendor) {
+            throw new \Exception('User is not associated with any vendor account.');
+        }
+
+        $query = Order::whereHas('items.product', function ($query) use ($user) {
+            $query->where('vendor_id', $user->vendor->id);
+        })
+        ->with(['user', 'items.product', 'items.variation']);
+
+        // Apply filters
+        if (isset($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (isset($filters['payment_status'])) {
+            $query->where('payment_status', $filters['payment_status']);
+        }
+
+        if (isset($filters['date_from'])) {
+            $query->whereDate('created_at', '>=', $filters['date_from']);
+        }
+
+        if (isset($filters['date_to'])) {
+            $query->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        if (isset($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Apply sorting
+        if (isset($filters['sort_column']) && isset($filters['sort_direction'])) {
+            $query->orderBy($filters['sort_column'], $filters['sort_direction']);
+        } else {
+            $query->latest(); // Default sort by created_at desc
+        }
+
+        return $query->paginate(
+            $filters['per_page'] ?? 10,
+            ['*'],
+            'page',
+            $filters['page'] ?? 1
+        );
     }
 
     /**
@@ -329,10 +385,21 @@ class OrderService
      *
      * @param string $orderNumber
      * @return Order|null
+     * @throws \Exception
      */
     public function getVendorOrder(string $orderNumber): ?Order
     {
-        return $this->orderRepository->findByOrderNumberForVendor($orderNumber, Auth::user()->vendor->id);
+        $user = Auth::user();
+        
+        if (!$user) {
+            throw new \Exception('User not authenticated.');
+        }
+
+        if (!$user->vendor) {
+            throw new \Exception('User is not associated with any vendor account.');
+        }
+
+        return $this->orderRepository->findByOrderNumberForVendor($orderNumber, $user->vendor->id);
     }
 
     /**
@@ -345,9 +412,17 @@ class OrderService
      */
     public function updateVendorOrderStatus(Order $order, string $status): Order
     {
-        $vendorId = Auth::user()->vendor->id;
+        $user = Auth::user();
         
-        if (!$this->orderRepository->hasVendorProducts($order, $vendorId)) {
+        if (!$user) {
+            throw new \Exception('User not authenticated.');
+        }
+
+        if (!$user->vendor) {
+            throw new \Exception('User is not associated with any vendor account.');
+        }
+        
+        if (!$this->orderRepository->hasVendorProducts($order, $user->vendor->id)) {
             throw new \Exception('This order does not contain any products from your vendor account.');
         }
 
@@ -368,9 +443,17 @@ class OrderService
      */
     public function updateVendorShippingInfo(Order $order, array $data): Order
     {
-        $vendorId = Auth::user()->vendor->id;
+        $user = Auth::user();
         
-        if (!$this->orderRepository->hasVendorProducts($order, $vendorId)) {
+        if (!$user) {
+            throw new \Exception('User not authenticated.');
+        }
+
+        if (!$user->vendor) {
+            throw new \Exception('User is not associated with any vendor account.');
+        }
+        
+        if (!$this->orderRepository->hasVendorProducts($order, $user->vendor->id)) {
             throw new \Exception('This order does not contain any products from your vendor account.');
         }
 

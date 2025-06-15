@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Modules\Store\Models\BillingAddress;
 use Modules\Store\Models\ShippingAddress;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
@@ -262,19 +263,45 @@ class OrderController extends Controller
      */
     public function vendorIndex(Request $request): JsonResponse
     {
-        $filters = $request->validate([
-            'status' => 'sometimes|string|in:pending,processing,completed,cancelled',
-            'payment_status' => 'sometimes|string|in:pending,paid,failed,refunded',
-            'date_from' => 'sometimes|date',
-            'date_to' => 'sometimes|date|after_or_equal:date_from',
-            'search' => 'sometimes|string|max:255',
-        ]);
+        try {
+            $filters = $request->validate([
+                'status' => 'nullable|string|in:pending,processing,completed,cancelled,refunded',
+                'payment_status' => 'nullable|string|in:pending,paid,failed,refunded',
+                'date_from' => 'nullable|date',
+                'date_to' => 'nullable|date|after_or_equal:date_from',
+                'search' => 'nullable|string|max:255',
+                'sort' => 'nullable|string|in:created_at.desc,created_at.asc,total.desc,total.asc',
+                'page' => 'nullable|integer|min:1',
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ]);
 
-        $orders = $this->orderService->getVendorOrders($filters);
+            // Set default values if not provided
+            $filters['page'] = $filters['page'] ?? 1;
+            $filters['per_page'] = $filters['per_page'] ?? 10;
 
-        return response()->json([
-            'data' => $orders,
-        ]);
+            // Handle sort parameter
+            if (isset($filters['sort'])) {
+                [$column, $direction] = explode('.', $filters['sort']);
+                $filters['sort_column'] = $column;
+                $filters['sort_direction'] = $direction;
+                unset($filters['sort']);
+            }
+
+            $orders = $this->orderService->getVendorOrders($filters);
+
+            return response()->json([
+                'data' => $orders->items(),
+                'total' => $orders->total(),
+                'per_page' => $orders->perPage(),
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error($e);
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], $e->getCode());
+        }
     }
 
     /**
@@ -285,17 +312,23 @@ class OrderController extends Controller
      */
     public function vendorShow(string $orderNumber): JsonResponse
     {
-        $order = $this->orderService->getVendorOrder($orderNumber);
+        try {
+            $order = $this->orderService->getVendorOrder($orderNumber);
 
-        if (!$order) {
+            if (!$order) {
+                return response()->json([
+                    'message' => 'Order not found.',
+                ], 404);
+            }
+
             return response()->json([
-                'message' => 'Order not found or you do not have access to this order.',
-            ], 404);
+                'data' => $order,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 422);
         }
-
-        return response()->json([
-            'data' => $order,
-        ]);
     }
 
     /**
@@ -307,16 +340,16 @@ class OrderController extends Controller
      */
     public function vendorUpdateStatus(Request $request, string $orderNumber): JsonResponse
     {
-        $data = $request->validate([
-            'status' => 'required|string|in:pending,processing,completed,cancelled',
-        ]);
-
         try {
+            $data = $request->validate([
+                'status' => 'required|string|in:pending,processing,completed,cancelled',
+            ]);
+
             $order = $this->orderService->getVendorOrder($orderNumber);
 
             if (!$order) {
                 return response()->json([
-                    'message' => 'Order not found or you do not have access to this order.',
+                    'message' => 'Order not found.',
                 ], 404);
             }
 
@@ -329,7 +362,7 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage(),
-            ], 400);
+            ], 422);
         }
     }
 
@@ -342,20 +375,20 @@ class OrderController extends Controller
      */
     public function vendorUpdateShippingInfo(Request $request, string $orderNumber): JsonResponse
     {
-        $data = $request->validate([
-            'tracking_number' => 'required|string|max:255',
-            'shipping_carrier' => 'required|string|max:255',
-            'shipping_method' => 'required|string|max:255',
-            'estimated_delivery' => 'required|date|after:today',
-            'notes' => 'sometimes|string|max:1000',
-        ]);
-
         try {
+            $data = $request->validate([
+                'tracking_number' => 'required|string|max:255',
+                'shipping_carrier' => 'required|string|max:255',
+                'shipping_method' => 'required|string|max:255',
+                'estimated_delivery' => 'required|date|after:today',
+                'notes' => 'sometimes|string|max:1000',
+            ]);
+
             $order = $this->orderService->getVendorOrder($orderNumber);
 
             if (!$order) {
                 return response()->json([
-                    'message' => 'Order not found or you do not have access to this order.',
+                    'message' => 'Order not found.',
                 ], 404);
             }
 
@@ -368,7 +401,7 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage(),
-            ], 400);
+            ], 422);
         }
     }
 } 
