@@ -8,9 +8,15 @@ use Illuminate\Support\Facades\Log;
 use Modules\Store\Models\Product;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
-
+use Modules\Common\Services\CloudImageService;
 class ProductRepository
 {
+    protected $cloudImageService;
+
+    public function __construct(CloudImageService $cloudImageService)
+    {
+        $this->cloudImageService = $cloudImageService;
+    }
     /**
      * Get all products with pagination and filters
      */
@@ -117,7 +123,16 @@ class ProductRepository
     {
         try {
             DB::beginTransaction();
-            
+            $images = [];
+            if(isset($data['images'])){
+                foreach($data['images'] as $image){
+                    $image = $this->cloudImageService->upload($image);
+                    if(isset($image['secure_url'])){
+                        $images[] = $image['secure_url'];
+                    }
+                }
+            }
+            $data['images'] = $images;
             $product = Product::create($data);
             
             DB::commit();

@@ -3,5 +3,6 @@
     "Authentication": true,
     "User": true,
     "Store": true,
-    "Blog": true
+    "Blog": true,
+    "Common": true
 }

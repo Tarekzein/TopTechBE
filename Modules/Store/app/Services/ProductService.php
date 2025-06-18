@@ -27,10 +27,10 @@ class ProductService
             'stock' => 'required|integer|min:0',
             'sku' => 'required|string|max:50|unique:products,sku' . ($id ? ",$id" : ''),
             'images' => 'nullable|array',
-            'images.*' => 'string|max:255',
-            'is_active' => 'boolean',
+            'images.*' => 'file|mimes:jpeg,png,jpg|max:2048',
             'category_id' => 'required|exists:categories,id',
-            'vendor_id' => 'required|exists:vendors,id'
+            'vendor_id' => 'required|exists:vendors,id',
+            'serial_number' => 'nullable|string|max:50',
         ];
 
         $validator = Validator::make($data, $rules);

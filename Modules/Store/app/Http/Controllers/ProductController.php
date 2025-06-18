@@ -82,7 +82,9 @@ class ProductController extends Controller
     {
         try {
             Log::info('Creating product', $request->all());
-            $product = $this->productService->createProduct($request->all());
+            $data = $request->all();
+            $data['vendor_id'] = $request->user()->vendor->id;
+            $product = $this->productService->createProduct($data);
             
             return response()->json([
                 'status' => 'success',
@@ -90,10 +92,11 @@ class ProductController extends Controller
                 'data' => $product
             ], 201);
         } catch (Exception $e) {
+            Log::error('Error creating product', ['message' => $e]);
             return response()->json([
                 'status' => 'error',
                 'message' => $e->getMessage()
-            ], 422);
+            ], 500);
         }
     }
 
