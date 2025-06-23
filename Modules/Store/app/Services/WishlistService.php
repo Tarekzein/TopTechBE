@@ -37,7 +37,7 @@ class WishlistService
     {
         try {
             // Validate product exists
-            $product = $this->productRepository->find($productId);
+            $product = $this->productRepository->findById($productId);
             if (!$product) {
                 throw new Exception('Product not found', 404);
             }
@@ -83,4 +83,4 @@ class WishlistService
     {
         return Str::random(32);
     }
-} 
+}

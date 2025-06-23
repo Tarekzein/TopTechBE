@@ -21,7 +21,7 @@ class WishlistController extends Controller
     {
         try {
             $userId = auth()->id();
-            $guestToken = $request->cookie('guest_token');
+            $guestToken = $request->header('X-Guest-Token') ?? $request->query('guest_token');
 
             $wishlist = $this->wishlistService->getWishlist($userId, $guestToken);
 
@@ -32,9 +32,7 @@ class WishlistController extends Controller
 
             $response = response()->json([
                 'status' => 'success',
-                'data' => [
-                    'wishlist' => $wishlist,
-                ],
+                'data' => $wishlist,
             ]);
 
             if (!$userId && $guestToken) {
@@ -57,8 +55,9 @@ class WishlistController extends Controller
                 'product_id' => 'required|integer|exists:products,id',
             ]);
 
-            $userId = auth()->id();
-            $guestToken = $request->cookie('guest_token');
+
+            $userId = $request->user_id ?? auth()->id();
+            $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
 
             $wishlist = $this->wishlistService->getWishlist($userId, $guestToken);
             if (!$wishlist) {
@@ -67,20 +66,15 @@ class WishlistController extends Controller
             }
 
             $item = $this->wishlistService->addItem($wishlist, $request->product_id);
-
-            $response = response()->json([
-                'status' => 'success',
-                'message' => 'Product added to wishlist',
-                'data' => [
-                    'item' => $item,
-                ],
-            ]);
-
-            if (!$userId && $guestToken) {
-                $response->cookie('guest_token', $guestToken, 60 * 24 * 30); // 30 days
+            if($item){
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Product added to wishlist',
+                    'data' => $wishlist,
+                ]);
             }
 
-            return $response;
+            throw new Exception('error occured');
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
@@ -93,7 +87,7 @@ class WishlistController extends Controller
     {
         try {
             $userId = auth()->id();
-            $guestToken = $request->cookie('guest_token');
+            $guestToken = $request->header('X-Guest-Token') ?? $request->query('guest_token');
 
             $wishlist = $this->wishlistService->getWishlist($userId, $guestToken);
             if (!$wishlist) {
@@ -105,6 +99,7 @@ class WishlistController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Product removed from wishlist',
+                'data' => $wishlist,
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -118,7 +113,7 @@ class WishlistController extends Controller
     {
         try {
             $userId = auth()->id();
-            $guestToken = $request->cookie('guest_token');
+            $guestToken = $request->header('X-Guest-Token') ?? $request->query('guest_token');
 
             $wishlist = $this->wishlistService->getWishlist($userId, $guestToken);
             if (!$wishlist) {
@@ -130,6 +125,7 @@ class WishlistController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Wishlist cleared successfully',
+                'data' => $wishlist,
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -143,7 +139,7 @@ class WishlistController extends Controller
     {
         try {
             $userId = auth()->id();
-            $guestToken = $request->cookie('guest_token');
+            $guestToken = $request->header('X-Guest-Token') ?? $request->query('guest_token');
 
             if (!$userId) {
                 throw new Exception('User must be authenticated to merge wishlists', 401);
@@ -161,9 +157,7 @@ class WishlistController extends Controller
             return response()->json([
                 'status' => 'success',
                 'message' => 'Wishlists merged successfully',
-                'data' => [
-                    'wishlist' => $mergedWishlist,
-                ],
+                'data' => $mergedWishlist,
             ])->cookie('guest_token', null, -1); // Remove guest token cookie
         } catch (Exception $e) {
             return response()->json([
@@ -172,4 +166,4 @@ class WishlistController extends Controller
             ], $e->getCode() ?: 500);
         }
     }
-} 
+}
