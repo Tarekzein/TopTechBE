@@ -88,7 +88,28 @@ class OrderController extends Controller
 
         // Validate that the totals match
         $calculatedSubtotal = collect($request->meta_data['cart_items'])->sum(function ($item) {
-            return $item['price'] * $item['quantity'];
+            // Use sale logic for variable and simple products
+            $now = \Carbon\Carbon::now('UTC');
+            $saleStart = isset($item['sale_start']) ? \Carbon\Carbon::parse($item['sale_start'])->timezone('UTC') : null;
+            $saleEnd = isset($item['sale_end']) ? \Carbon\Carbon::parse($item['sale_end'])->timezone('UTC') : null;
+            $useSale = (
+                isset($item['sale_price']) && $item['sale_price'] &&
+                $saleStart && $saleEnd &&
+                $now->between($saleStart, $saleEnd)
+            );
+            $price = $useSale
+                ? (float) $item['sale_price']
+                : (isset($item['regular_price']) ? (float) $item['regular_price'] : (float) $item['price']);
+            Log::info('OrderController subtotal debug', [
+                'item' => $item,
+                'used_price' => $price,
+                'quantity' => $item['quantity'],
+                'line_total' => $price * $item['quantity'],
+                'now' => $now->toIso8601String(),
+                'saleStart' => $saleStart ? $saleStart->toIso8601String() : null,
+                'saleEnd' => $saleEnd ? $saleEnd->toIso8601String() : null,
+            ]);
+            return $price * $item['quantity'];
         });
         
         if (abs($calculatedSubtotal - $request->subtotal) > 0.01) {

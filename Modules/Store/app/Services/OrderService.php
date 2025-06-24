@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Collection;
 use Modules\Store\Models\Product;
+use Illuminate\Support\Facades\Log;
 
 class OrderService
 {
@@ -32,33 +33,89 @@ class OrderService
     {
         return DB::transaction(function () use ($data, $cart) {
             try {
-                // Load cart items with their products
-                $cart->load(['items.product']);
+                // Load cart items with their products and product variations
+                $cart->load(['items.product', 'items.productVariation']);
+
+                // Debug log to verify loaded cart items and their variations
+                Log::info('Cart items for order', [
+                    'cart_items' => $cart->items->map(function ($item) {
+                        return [
+                            'product_id' => $item->product_id,
+                            'variation_id' => $item->variation_id ?? null,
+                            'productVariation' => $item->productVariation,
+                            'product' => $item->product,
+                        ];
+                    })
+                ]);
 
                 // Create a map of product prices from meta_data
-                $metaPrices = collect($data['meta_data']['cart_items'])->keyBy('product_id')
-                    ->map(function ($item) {
-                        return [
+                $metaPrices = collect($data['meta_data']['cart_items'])->mapWithKeys(function ($item) {
+                    $variationId = $item['variation_id'] ?? null;
+                    $key = $item['product_id'] . '-' . ($variationId ?? '0');
+                    return [
+                        $key => [
                             'price' => (float) $item['price'],
-                            'quantity' => (int) $item['quantity']
-                        ];
-                    });
+                            'quantity' => (int) $item['quantity'],
+                            'variation_id' => $variationId,
+                        ]
+                    ];
+                });
 
                 // Calculate totals using the prices from meta_data
                 $cartItems = $cart->items->map(function ($item) use ($metaPrices) {
-                    $metaItem = $metaPrices->get($item->product_id);
+                    // Use product_variation_id if present, otherwise variation_id, otherwise null
+                    $variationId = $item->product_variation_id ?? $item->variation_id ?? null;
+                    $key = $item->product_id . '-' . ($variationId ?? '0');
+                    $metaItem = $metaPrices->get($key);
                     if (!$metaItem) {
+                        Log::error('Meta item not found', [
+                            'key' => $key,
+                            'metaPrices_keys' => $metaPrices->keys(),
+                            'item' => $item,
+                        ]);
                         throw new \Exception(sprintf(
-                            'Product ID %d not found in meta_data',
-                            $item->product_id
+                            'Product ID %d (variation %s) not found in meta_data',
+                            $item->product_id,
+                            $variationId
                         ));
+                    }
+
+                    // Use the price from the loaded productVariation if it exists, with sale logic
+                    if ($item->productVariation) {
+                        $now = now();
+                        $saleStart = $item->productVariation->sale_start ? \Carbon\Carbon::parse($item->productVariation->sale_start) : null;
+                        $saleEnd = $item->productVariation->sale_end ? \Carbon\Carbon::parse($item->productVariation->sale_end) : null;
+                        if (
+                            $item->productVariation->sale_price &&
+                            $saleStart && $saleEnd &&
+                            $now->between($saleStart, $saleEnd)
+                        ) {
+                            $price = (float) $item->productVariation->sale_price;
+                        } else {
+                            $price = (float) $item->productVariation->regular_price;
+                        }
+                    } else {
+                        // For simple products, use sale logic if present
+                        $now = now();
+                        $saleStart = $item->product->sale_start ? \Carbon\Carbon::parse($item->product->sale_start) : null;
+                        $saleEnd = $item->product->sale_end ? \Carbon\Carbon::parse($item->product->sale_end) : null;
+                        if (
+                            $item->product->sale_price &&
+                            $saleStart && $saleEnd &&
+                            $now->between($saleStart, $saleEnd)
+                        ) {
+                            $price = (float) $item->product->sale_price;
+                        } else {
+                            $price = (float) $item->product->regular_price;
+                        }
                     }
 
                     return [
                         'product_id' => $item->product_id,
+                        'variation_id' => $variationId,
                         'quantity' => $metaItem['quantity'],
-                        'price' => $metaItem['price'],
-                        'subtotal' => round($metaItem['price'] * $metaItem['quantity'], 2)
+                        'price' => $price,
+                        'subtotal' => round($price * $metaItem['quantity'], 2)
                     ];
                 });
 
@@ -68,7 +125,7 @@ class OrderService
                 $cartTotal = round($cartSubtotal + $cartTax + $shippingCost, 2);
 
                 // Log the values for debugging
-                \Log::info('Order totals calculation', [
+                Log::info('Order totals calculation', [
                     'cart_subtotal' => $cartSubtotal,
                     'provided_subtotal' => $data['subtotal'],
                     'cart_tax' => $cartTax,
@@ -132,9 +189,12 @@ class OrderService
                 foreach ($cartItems as $item) {
                     $this->createOrderItem($order, [
                         'product_id' => $item['product_id'],
+                        'variation_id' => $item['variation_id'],
                         'quantity' => $item['quantity'],
                         'price' => $item['price'],
-                        'attributes' => $cart->items->firstWhere('product_id', $item['product_id'])->attributes ?? []
+                        'attributes' => $cart->items->firstWhere(function($cartItem) use ($item) {
+                            return $cartItem->product_id == $item['product_id'] && ($cartItem->variation_id ?? null) == ($item['variation_id'] ?? null);
+                        })?->attributes ?? []
                     ]);
                 }
 
@@ -143,7 +203,7 @@ class OrderService
 
                 return $order;
             } catch (\Exception $e) {
-                \Log::error('Failed to create order', [
+                Log::error('Failed to create order', [
                     'cart_id' => $cart->id,
                     'user_id' => $cart->user_id,
                     'data' => $data,
@@ -168,8 +228,8 @@ class OrderService
 
         // Validate required fields
         if (empty($itemData['product_id']) || empty($itemData['quantity']) || empty($itemData['price'])) {
-            throw new \Exception('Missing required field for order item: ' . 
-                (empty($itemData['product_id']) ? 'product_id' : 
+            throw new \Exception('Missing required field for order item: ' .
+                (empty($itemData['product_id']) ? 'product_id' :
                 (empty($itemData['quantity']) ? 'quantity' : 'price')));
         }
 
@@ -323,7 +383,7 @@ class OrderService
     public function getVendorOrders(array $filters = []): \Illuminate\Contracts\Pagination\LengthAwarePaginator
     {
         $user = Auth::user();
-        
+
         if (!$user) {
             throw new \Exception('User not authenticated.');
         }
@@ -390,7 +450,7 @@ class OrderService
     public function getVendorOrder(string $orderNumber): ?Order
     {
         $user = Auth::user();
-        
+
         if (!$user) {
             throw new \Exception('User not authenticated.');
         }
@@ -413,7 +473,7 @@ class OrderService
     public function updateVendorOrderStatus(Order $order, string $status): Order
     {
         $user = Auth::user();
-        
+
         if (!$user) {
             throw new \Exception('User not authenticated.');
         }
@@ -421,7 +481,7 @@ class OrderService
         if (!$user->vendor) {
             throw new \Exception('User is not associated with any vendor account.');
         }
-        
+
         if (!$this->orderRepository->hasVendorProducts($order, $user->vendor->id)) {
             throw new \Exception('This order does not contain any products from your vendor account.');
         }
@@ -444,7 +504,7 @@ class OrderService
     public function updateVendorShippingInfo(Order $order, array $data): Order
     {
         $user = Auth::user();
-        
+
         if (!$user) {
             throw new \Exception('User not authenticated.');
         }
@@ -452,11 +512,11 @@ class OrderService
         if (!$user->vendor) {
             throw new \Exception('User is not associated with any vendor account.');
         }
-        
+
         if (!$this->orderRepository->hasVendorProducts($order, $user->vendor->id)) {
             throw new \Exception('This order does not contain any products from your vendor account.');
         }
 
         return $this->updateShippingInfo($order, $data);
     }
-} 
+}

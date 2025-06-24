@@ -2,7 +2,6 @@
 
 namespace Modules\Store\Http\Controllers;
 
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Log;
@@ -14,27 +13,49 @@ use Exception;
 
 class CartController extends Controller
 {
-    protected $cartService;
+    protected CartService $cartService;
 
     public function __construct(CartService $cartService)
     {
         $this->cartService = $cartService;
     }
 
-    protected function getUserId()
+    protected function getUserId(): ?int
     {
         return Auth::check() ? Auth::id() : null;
+    }
+
+    protected function getGuestToken(Request $request): ?string
+    {
+        return $request->header('X-Guest-Token') ?? $request->input('guest_token');
+    }
+
+    protected function loadCartRelations($cart)
+    {
+        $cart->load(['items.product', 'items.productVariation']);
+
+        // Apply formatted attributes to each variation
+        foreach ($cart->items as $item) {
+            if ($item->productVariation) {
+                $item->productVariation->attributes = $item->productVariation->formatted_attributes;
+            }
+        }
+
+        return $cart;
     }
 
     public function getCart(Request $request)
     {
         try {
             $userId = $this->getUserId();
-            $guestToken = $request->header('X-Guest-Token') ?? $request->query('guest_token');
+            $guestToken = $this->getGuestToken($request);
+
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
-            return response()->json(['status' => 'success', 'data' => $cart->load('items.product')]);
+            $this->loadCartRelations($cart);
+
+            return response()->json(['status' => 'success', 'data' => $cart]);
         } catch (Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e);
         }
     }
 
@@ -43,32 +64,29 @@ class CartController extends Controller
         try {
             $validated = $request->validate([
                 'product_id' => 'required|integer',
-                'quantity' => 'required|integer|min:1',
+                'quantity' => 'required|integer',
+                'product_variation_id' => 'nullable|integer',
             ]);
-            $userId = $request->user_id?? $this->getUserId();
-            $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
-            Log::info('Adding item to cart', [
-                'user_id' => $userId,
-                'guest_token' => $guestToken,
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-            ]);
-            if (!$userId && !$guestToken) {
-                $guestToken = Str::uuid()->toString();
-            }
+
+            $userId = $request->user_id ?? $this->getUserId();
+            $guestToken = $this->getGuestToken($request) ?? Str::uuid()->toString();
+
+            Log::info('Adding item to cart', array_merge($validated, compact('userId', 'guestToken')));
+
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
-            $item = $this->cartService->addItem($cart, $validated['product_id'], $validated['quantity']);
+            $this->cartService->addItem($cart, $validated['product_id'], $validated['quantity'], $validated['product_variation_id'] ?? null);
+            $this->loadCartRelations($cart);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Item added to cart',
-                'data' => $cart->fresh('items.product'),
+                'data' => $cart,
                 'guest_token' => $guestToken,
             ], 201);
         } catch (ValidationException $e) {
-            Log::error($e);
-            return response()->json(['status' => 'error', 'message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+            return $this->validationErrorResponse($e);
         } catch (Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e);
         }
     }
 
@@ -78,31 +96,27 @@ class CartController extends Controller
             $validated = $request->validate([
                 'product_id' => 'required|integer',
                 'quantity' => 'required|integer|min:1',
+                'product_variation_id' => 'nullable|integer',
             ]);
-            Log::info('Updating cart item', [
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-                'headers' => $request->headers->all(),
-            ]);
+
             $userId = $request->user_id ?? $this->getUserId();
-            $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
-            Log::info('Updating cart item', [
-                'user_id' => $userId,
-                'guest_token' => $guestToken,
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-            ]);
+            $guestToken = $this->getGuestToken($request);
+
+            Log::info('Updating cart item', array_merge($validated, compact('userId', 'guestToken')));
+
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
-            $item = $this->cartService->updateItem($cart, $validated['product_id'], $validated['quantity']);
+            $this->cartService->updateItem($cart, $validated['product_id'], $validated['quantity'], $validated['product_variation_id'] ?? null);
+            $this->loadCartRelations($cart);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Cart item updated',
-                'data' => $cart->fresh('items.product'),
+                'data' => $cart,
             ]);
         } catch (ValidationException $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+            return $this->validationErrorResponse($e);
         } catch (Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e);
         }
     }
 
@@ -112,19 +126,23 @@ class CartController extends Controller
             $validated = $request->validate([
                 'product_id' => 'required|integer',
             ]);
+
             $userId = $request->user_id ?? $this->getUserId();
-            $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
+            $guestToken = $this->getGuestToken($request);
+
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
             $this->cartService->removeItem($cart, $validated['product_id']);
+            $this->loadCartRelations($cart);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Item removed from cart',
-                'data' => $cart->fresh('items.product'),
+                'data' => $cart,
             ]);
         } catch (ValidationException $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage(), 'errors' => $e->errors()], 422);
+            return $this->validationErrorResponse($e);
         } catch (Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e);
         }
     }
 
@@ -132,41 +150,61 @@ class CartController extends Controller
     {
         try {
             $userId = $request->user()->id ?? $this->getUserId();
-            $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
+            $guestToken = $this->getGuestToken($request);
+
             $cart = $this->cartService->getOrCreateCart($userId, $guestToken);
             $this->cartService->clearCart($cart);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Cart cleared',
             ]);
         } catch (Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e);
         }
     }
 
-    // Call this endpoint after login to merge guest cart with user cart
     public function mergeOnLogin(Request $request)
     {
         try {
             $userId = $this->getUserId();
-            $guestToken = $request->header('X-Guest-Token') ?? $request->input('guest_token');
+            $guestToken = $this->getGuestToken($request);
+
             if (!$userId || !$guestToken) {
                 return response()->json(['status' => 'error', 'message' => 'User or guest token missing'], 400);
             }
+
             $userCart = $this->cartService->getOrCreateCart($userId, null);
             $guestCart = $this->cartService->getOrCreateCart(null, $guestToken);
-            if ($guestCart && $guestCart->items->count()) {
-                $cart = $this->cartService->mergeCarts($userCart, $guestCart);
-            } else {
-                $cart = $userCart;
-            }
+
+            $cart = ($guestCart && $guestCart->items->count())
+                ? $this->cartService->mergeCarts($userCart, $guestCart)
+                : $userCart;
+
+            $this->loadCartRelations($cart);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Cart merged',
-                'data' => $cart->load('items.product'),
+                'data' => $cart,
             ]);
         } catch (Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e);
         }
+    }
+
+    private function validationErrorResponse(ValidationException $e)
+    {
+        return response()->json([
+            'status' => 'error',
+            'message' => $e->getMessage(),
+            'errors' => $e->errors(),
+        ], 422);
+    }
+
+    private function errorResponse(Exception $e)
+    {
+        Log::error($e);
+        return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
     }
 }

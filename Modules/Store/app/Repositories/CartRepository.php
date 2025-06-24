@@ -12,9 +12,9 @@ class CartRepository
     {
         try {
             if ($userId) {
-                return Cart::with('items.product')->where('user_id', $userId)->first();
+                return Cart::with(['items.product','items.productVariation'])->where('user_id', $userId)->first();
             } elseif ($guestToken) {
-                return Cart::with('items.product')->where('guest_token', $guestToken)->first();
+                return Cart::with(['items.product','items.productVariation'])->where('guest_token', $guestToken)->first();
             }
             return null;
         } catch (Exception $e) {
@@ -34,7 +34,7 @@ class CartRepository
         }
     }
 
-    public function addItem($cart, $productId, $quantity = 1)
+    public function addItem($cart, $productId, $quantity = 1, $productVariationId=null)
     {
         DB::beginTransaction();
         try {
@@ -46,6 +46,7 @@ class CartRepository
                 $item = $cart->items()->create([
                     'product_id' => $productId,
                     'quantity' => $quantity,
+                    'product_variation_id' => $productVariationId,
                 ]);
             }
             DB::commit();

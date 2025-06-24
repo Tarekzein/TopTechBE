@@ -2,7 +2,9 @@
 
 namespace Modules\Store\Services;
 
+use Illuminate\Support\Facades\Log;
 use Modules\Store\Models\Product;
+use Modules\Store\Models\ProductVariation;
 use Modules\Store\Repositories\CartRepository;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -26,7 +28,7 @@ class CartService
         return $cart;
     }
 
-    public function addItem($cart, $productId, $quantity = 1)
+    public function addItem($cart, $productId, $quantity = 1, $productVariationId=null)
     {
         $product = Product::find($productId);
         if (!$product || !$product->is_active) {
@@ -35,13 +37,27 @@ class CartService
         if ($quantity < 1) {
             throw ValidationException::withMessages(['quantity' => 'Quantity must be at least 1.']);
         }
-        if ($product->stock < $quantity) {
+        if ($product->stock < $quantity && $product->product_type !== 'variable') {
             throw ValidationException::withMessages(['quantity' => 'Not enough stock.']);
         }
-        return $this->cartRepository->addItem($cart, $productId, $quantity);
+        if ($productVariationId) {
+            $productVariation = ProductVariation::find($productVariationId);
+            if (!$productVariation || !$productVariation->is_active) {
+                throw ValidationException::withMessages(['product_variation_id' => 'Product variation not found or inactive.']);
+            }
+            if ($productVariation->stock < $quantity) {
+                Log::info('Not enough stock for product variation', [
+                    'product_variation_id' => $productVariationId,
+                    'requested_quantity' => $quantity,
+                    'available_stock' => $productVariation->stock,
+                ]);
+                throw ValidationException::withMessages(['quantity' => 'Not enough stock.']);
+            }
+        }
+        return $this->cartRepository->addItem($cart, $productId, $quantity, $productVariationId);
     }
 
-    public function updateItem($cart, $productId, $quantity)
+    public function updateItem($cart, $productId, $quantity, $productVariationId=null)
     {
         $product = Product::find($productId);
         if (!$product || !$product->is_active) {
@@ -50,10 +66,24 @@ class CartService
         if ($quantity < 1) {
             throw ValidationException::withMessages(['quantity' => 'Quantity must be at least 1.']);
         }
-        if ($product->stock < $quantity) {
+        if ($product->stock < $quantity && $product->product_type !== 'variable') {
             throw ValidationException::withMessages(['quantity' => 'Not enough stock.']);
         }
-        return $this->cartRepository->updateItem($cart, $productId, $quantity);
+        if ($productVariationId) {
+            $productVariation = ProductVariation::find($productVariationId);
+            if (!$productVariation || !$productVariation->is_active) {
+                throw ValidationException::withMessages(['product_variation_id' => 'Product variation not found or inactive.']);
+            }
+            if ($productVariation->stock < $quantity) {
+                Log::info('Not enough stock for product variation', [
+                    'product_variation_id' => $productVariationId,
+                    'requested_quantity' => $quantity,
+                    'available_stock' => $productVariation->stock,
+                ]);
+                throw ValidationException::withMessages(['quantity' => 'Not enough stock.']);
+            }
+        }
+        return $this->cartRepository->updateItem($cart, $productId, $quantity, $productVariationId);
     }
 
     public function removeItem($cart, $productId)
