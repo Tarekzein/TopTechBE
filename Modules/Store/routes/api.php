@@ -12,6 +12,7 @@ use Modules\Store\Http\Controllers\OrderController;
 use Modules\Store\Http\Controllers\AddressController;
 use Modules\Store\Http\Controllers\PaymentController;
 use Modules\Store\Http\Controllers\SettingController;
+use Modules\Store\Http\Controllers\CurrencyController;
 /*
 |--------------------------------------------------------------------------
 | Store Module API Routes
@@ -19,6 +20,11 @@ use Modules\Store\Http\Controllers\SettingController;
 */
 
 Route::prefix('store')->group(function () {
+    // Currency Routes
+    Route::prefix('currencies')->group(function () {
+        Route::get('/', [CurrencyController::class, 'index']);
+    });
+
     // Category Routes
     Route::prefix('categories')->group(function () {
         // Public routes
@@ -146,11 +152,11 @@ Route::prefix('store')->group(function () {
 
     });
 
-    Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
+    Route::group(["prefix"=>"settings"],function () {
         // Settings routes
-        Route::prefix('settings')->group(function () {
-            Route::get('/', [SettingController::class, 'index']);
-            Route::get('/groups', [SettingController::class, 'getGroups']);
+        Route::get('/', [SettingController::class, 'index']);
+        Route::get('/groups', [SettingController::class, 'getGroups']);
+        Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
             Route::get('/{key}', [SettingController::class, 'show']);
             Route::put('/{key}', [SettingController::class, 'update']);
             Route::put('/bulk-update', [SettingController::class, 'bulkUpdate']);
@@ -189,7 +195,7 @@ Route::middleware('auth:sanctum')->get('/debug-auth-protected', function (Reques
     return response()->json([
         'message' => 'Authentication successful!',
         'user' => $request->user(),
-        'user_id' => auth()->id(),
+        'user_id' => $request->user()->id,
     ]);
 });
 

@@ -175,10 +175,22 @@ class SettingRepository implements SettingRepositoryInterface
             }])->get();
 
             return $settings->map(function ($setting) use ($locale) {
-                $setting->value = $setting->getValue($locale);
+                $setting->value = $setting->getCastedValue($locale);
                 return $setting;
             });
         });
+    }
+
+    /**
+     * Get all settings grouped by their group key.
+     *
+     * @param string|null $locale
+     * @return \Illuminate\Support\Collection
+     */
+    public function getAllGroupedByGroup(?string $locale = null): \Illuminate\Support\Collection
+    {
+        $settings = $this->getAllWithValues($locale);
+        return $settings->groupBy('group');
     }
 
     /**

@@ -28,9 +28,8 @@ class SettingController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $withValues = $request->boolean('with_values', false);
             $locale = $request->input('locale');
-            $settings = $this->settingService->getAllSettings($withValues, $locale);
+            $settings = $this->settingService->getAllSettings(true, $locale);
             
             return response()->json([
                 'status' => 'success',
@@ -40,6 +39,30 @@ class SettingController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to fetch settings',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available setting groups with their settings.
+     *
+     * @return JsonResponse
+     */
+    public function getGroups(Request $request): JsonResponse
+    {
+        try {
+            $locale = $request->input('locale');
+            $groupedSettings = $this->settingService->getAllSettingsGrouped(true, $locale);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $groupedSettings
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch setting groups',
                 'error' => $e->getMessage()
             ], 500);
         }

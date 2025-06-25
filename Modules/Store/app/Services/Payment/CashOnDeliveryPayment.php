@@ -53,7 +53,7 @@ class CashOnDeliveryPayment extends AbstractPaymentMethod
                 'type' => 'boolean',
                 'label' => 'Enable Cash on Delivery',
                 'description' => 'Enable or disable Cash on Delivery payment method',
-                'default' => false,
+                'default' => true,
                 'required' => true,
             ],
             'minimum_order_amount' => [

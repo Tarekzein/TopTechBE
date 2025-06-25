@@ -72,4 +72,20 @@ interface SettingRepositoryInterface
      * @return Collection
      */
     public function getAllWithValues(?string $locale = null): Collection;
+
+    /**
+     * Get all settings grouped by their group key.
+     *
+     * @param string|null $locale
+     * @return \Illuminate\Support\Collection
+     */
+    public function getAllGroupedByGroup(?string $locale = null): \Illuminate\Support\Collection;
+
+    /**
+     * Check if a setting exists by key
+     *
+     * @param string $key
+     * @return bool
+     */
+    public function exists(string $key): bool;
 }

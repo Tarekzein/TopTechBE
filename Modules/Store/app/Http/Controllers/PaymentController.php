@@ -32,7 +32,7 @@ class PaymentController extends Controller
                 'identifier' => $method->getIdentifier(),
                 'name' => $method->getName(),
                 'description' => $method->getDescription(),
-            ]);
+            ])->values();
 
         return response()->json([
             'status' => 'success',
@@ -50,7 +50,14 @@ class PaymentController extends Controller
             'payment_data' => 'array',
         ]);
 
-        $order = $this->orderRepository->findOrFail($orderId);
+        $order = $this->orderRepository->findByOrderNumber($orderId);
+
+        if (!$order) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Order not found.',
+            ], 404);
+        }
 
         try {
             $result = $this->paymentService->processPayment(

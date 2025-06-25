@@ -36,6 +36,15 @@ interface SettingServiceInterface
     public function getSettingsByGroup(string $group, bool $withValues = false, ?string $locale = null): Collection;
 
     /**
+     * Get all settings grouped by their group key.
+     *
+     * @param bool $withValues
+     * @param string|null $locale
+     * @return Collection
+     */
+    public function getAllSettingsGrouped(bool $withValues = true, ?string $locale = null): Collection;
+
+    /**
      * Get a setting value
      *
      * @param string $key

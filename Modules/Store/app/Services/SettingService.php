@@ -355,4 +355,16 @@ class SettingService implements SettingServiceInterface
     {
         return self::TYPES;
     }
+
+    /**
+     * Get all settings grouped by their group key.
+     *
+     * @param bool $withValues
+     * @param string|null $locale
+     * @return Collection
+     */
+    public function getAllSettingsGrouped(bool $withValues = true, ?string $locale = null): Collection
+    {
+        return $this->settingRepository->getAllGroupedByGroup($locale);
+    }
 }
