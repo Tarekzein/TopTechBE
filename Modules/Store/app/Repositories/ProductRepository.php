@@ -77,14 +77,16 @@ class ProductRepository
                 });
             }
 
-            $products = $query->paginate($perPage);
+            $products = $query->latest()->paginate($perPage);
             
             // Format variations with attributes
-            $products->each(function($product) {
-                $product->variations->each(function($variation) {
-                    $variation->attributes = $variation->getFormattedAttributesAttribute();
-                });
-            });
+            foreach($products as $product) {
+                if ($product->variations) {
+                    foreach($product->variations as $variation) {
+                        $variation->attributes = $variation->getFormattedAttributesAttribute();
+                    }
+                }
+            }
 
             return $products;
         } catch (Exception $e) {
@@ -106,9 +108,11 @@ class ProductRepository
                     $query->with(['images']);
                 }
             ])->findOrFail($id);
-            $product->variations->each(function($variation) {
-                $variation->attributes=$variation->getFormattedAttributesAttribute();
-            });
+            if ($product->variations) {
+                foreach($product->variations as $variation) {
+                    $variation->attributes=$variation->getFormattedAttributesAttribute();
+                }
+            }
             return $product;
         } catch (Exception $e) {
             Log::error('Error fetching product: ' . $e->getMessage());
@@ -199,11 +203,13 @@ class ProductRepository
                     }
                 ])
                 ->paginate($perPage);
-            $products->each(function($product) {
-                $product->variations->each(function($variation) {
-                    $variation->attributes=$variation->getFormattedAttributesAttribute();
-                });
-            });
+            foreach($products as $product) {
+                if ($product->variations) {
+                    foreach($product->variations as $variation) {
+                        $variation->attributes=$variation->getFormattedAttributesAttribute();
+                    }
+                }
+            }
             return $products;
         } catch (Exception $e) {
             Log::error('Error fetching products by category: ' . $e->getMessage());
@@ -226,11 +232,13 @@ class ProductRepository
                     }
                 ])
                 ->paginate($perPage);
-            $products->each(function($product) {
-                $product->variations->each(function($variation) {
-                    $variation->attributes=$variation->getFormattedAttributesAttribute();
-                });
-            });
+            foreach($products as $product) {
+                if ($product->variations) {
+                    foreach($product->variations as $variation) {
+                        $variation->attributes=$variation->getFormattedAttributesAttribute();
+                    }
+                }
+            }
             return $products;
         } catch (Exception $e) {
             Log::error('Error fetching products by vendor: ' . $e->getMessage());
@@ -253,9 +261,11 @@ class ProductRepository
                     }
                 ])
                 ->firstOrFail();
-            $product->variations->each(function($variation) {
-                $variation->attributes=$variation->getFormattedAttributesAttribute();
-            });
+            if ($product->variations) {
+                foreach($product->variations as $variation) {
+                    $variation->attributes=$variation->getFormattedAttributesAttribute();
+                }
+            }
             return $product;
         } catch (Exception $e) {
             Log::info($e);
@@ -281,11 +291,13 @@ class ProductRepository
                     }
                 ])
                 ->paginate($perPage);
-            $products->each(function($product) {
-                $product->variations->each(function($variation) {
-                    $variation->attributes=$variation->getFormattedAttributesAttribute();
-                });
-            });
+            foreach($products as $product) {
+                if ($product->variations) {
+                    foreach($product->variations as $variation) {
+                        $variation->attributes=$variation->getFormattedAttributesAttribute();
+                    }
+                }
+            }
             return $products;
         } catch (Exception $e) {
             Log::error('Error searching products: ' . $e->getMessage());
