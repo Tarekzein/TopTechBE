@@ -24,7 +24,7 @@ class ProductVariationService
             'sale_start' => 'nullable|date',
             'sale_end' => 'nullable|date|after_or_equal:sale_start',
             'manage_stock' => 'boolean',
-            'stock' => 'required_if:manage_stock,true|integer|min:0',
+            'stock' => 'required|integer|min:0',
             'allow_backorders' => 'boolean',
             'low_stock_threshold' => 'nullable|integer|min:0',
             'weight' => 'nullable|numeric|min:0',
@@ -34,7 +34,6 @@ class ProductVariationService
             'height' => 'nullable|numeric|min:0',
             'dimension_unit' => 'required_with:length,width,height|in:cm,m,mm,in,ft',
             'attributes' => 'required|array',
-            'attributes.*' => 'required|exists:product_attribute_values,id',
             'is_active' => 'boolean'
         ];
 
@@ -104,11 +103,19 @@ class ProductVariationService
             // Create variation images if provided
             if (isset($data['images']) && is_array($data['images'])) {
                 foreach ($data['images'] as $index => $image) {
-                    ProductVariationImage::create([
-                        'variation_id' => $variation->id,
-                        'image' => $image,
-                        'display_order' => $index
-                    ]);
+                    if ($image instanceof \Illuminate\Http\UploadedFile) {
+                        // Upload image using CloudImageService
+                        $cloudImageService = app(\Modules\Common\Services\CloudImageService::class);
+                        $uploadedImage = $cloudImageService->upload($image);
+                        
+                        if (isset($uploadedImage['secure_url'])) {
+                            ProductVariationImage::create([
+                                'variation_id' => $variation->id,
+                                'image' => $uploadedImage['secure_url'],
+                                'display_order' => $index
+                            ]);
+                        }
+                    }
                 }
             }
 

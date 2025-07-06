@@ -30,6 +30,7 @@ class Product extends Model
         'low_stock_threshold',
         'sold_individually',
         'sku',
+        'serial_number',
         'images',
         'is_active',
         'category_id',

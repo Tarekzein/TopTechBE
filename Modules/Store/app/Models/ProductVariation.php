@@ -96,7 +96,7 @@ class ProductVariation extends Model
     public function getFormattedAttributesAttribute()
     {
         if (empty($this->attributes['attributes'])) {
-            return [];
+            return ['attributes' => []];
         }
 
         $formatted = ['attributes' => []];
