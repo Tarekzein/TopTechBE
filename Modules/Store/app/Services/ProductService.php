@@ -55,6 +55,9 @@ class ProductService
             'is_active' => 'boolean',
             'attributes' => 'nullable|array',
             'variations' => 'nullable|array',
+            'search' => 'nullable|string',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
         ];
 
         $validator = Validator::make($data, $rules);
@@ -289,7 +292,31 @@ class ProductService
      */
     public function deleteProduct(int $id)
     {
-        return $this->productRepository->delete($id);
+        try {
+            DB::beginTransaction();
+            
+            $product = Product::findOrFail($id);
+            
+            // Delete all variations and their images first
+            if ($product->variations) {
+                foreach ($product->variations as $variation) {
+                    // Delete variation images
+                    $variation->images()->delete();
+                    // Delete variation
+                    $variation->delete();
+                }
+            }
+            
+            // Delete the product
+            $product->delete();
+            
+            DB::commit();
+            return true;
+        } catch (Exception $e) {
+            DB::rollBack();
+            Log::error('Error deleting product: ' . $e->getMessage());
+            throw new Exception('Failed to delete product');
+        }
     }
 
     /**

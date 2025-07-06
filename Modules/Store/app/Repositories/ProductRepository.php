@@ -31,6 +31,16 @@ class ProductRepository
                 }
             ]);
 
+            // Apply search filter (search by name or SKU)
+            if (!empty($filters['search'])) {
+                $search = $filters['search'];
+                $query->where(function($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%");
+                });
+            }
+
             // Apply category filter
             if (!empty($filters['category_id'])) {
                 $query->where('category_id', $filters['category_id']);
@@ -41,12 +51,20 @@ class ProductRepository
                 $query->where('vendor_id', $filters['vendor_id']);
             }
 
+            // Apply date range filter
+            if (!empty($filters['date_from'])) {
+                $query->whereDate('created_at', '>=', $filters['date_from']);
+            }
+            if (!empty($filters['date_to'])) {
+                $query->whereDate('created_at', '<=', $filters['date_to']);
+            }
+
             // Apply price range filter
             if (!empty($filters['price_min'])) {
                 $query->where(function($q) use ($filters) {
                     $q->where('price', '>=', $filters['price_min'])
                       ->orWhereHas('variations', function($q) use ($filters) {
-                          $q->where('price', '>=', $filters['price_min']);
+                          $q->where('regular_price', '>=', $filters['price_min']);
                       });
                 });
             }
@@ -54,27 +72,34 @@ class ProductRepository
                 $query->where(function($q) use ($filters) {
                     $q->where('price', '<=', $filters['price_max'])
                       ->orWhereHas('variations', function($q) use ($filters) {
-                          $q->where('price', '<=', $filters['price_max']);
+                          $q->where('regular_price', '<=', $filters['price_max']);
                       });
                 });
             }
 
-            // Apply attribute filters (color, size)
-            if (!empty($filters['color']) || !empty($filters['size'])) {
-                $query->whereHas('variations', function($q) use ($filters) {
-                    if (!empty($filters['color'])) {
-                        $q->whereHas('attributes', function($q) use ($filters) {
-                            $q->where('type', 'color')
-                              ->where('value', $filters['color']);
-                        });
-                    }
-                    if (!empty($filters['size'])) {
-                        $q->whereHas('attributes', function($q) use ($filters) {
-                            $q->where('type', 'size')
-                              ->where('value', $filters['size']);
-                        });
-                    }
-                });
+            // Apply sort order
+            if (!empty($filters['sort'])) {
+                $sortParts = explode('.', $filters['sort']);
+                $field = $sortParts[0];
+                $direction = isset($sortParts[1]) ? $sortParts[1] : 'asc';
+                
+                // Map frontend sort fields to database fields
+                $sortMap = [
+                    'created_at' => 'created_at',
+                    'name' => 'name',
+                    'price' => 'price',
+                    'newest' => 'created_at',
+                    'oldest' => 'created_at'
+                ];
+                
+                if (isset($sortMap[$field])) {
+                    $dbField = $sortMap[$field];
+                    $dbDirection = in_array($direction, ['desc', 'newest']) ? 'desc' : 'asc';
+                    $query->orderBy($dbField, $dbDirection);
+                }
+            } else {
+                // Default sort by created_at desc
+                $query->orderBy('created_at', 'desc');
             }
 
             $products = $query->latest()->paginate($perPage);

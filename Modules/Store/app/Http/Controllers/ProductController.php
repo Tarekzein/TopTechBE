@@ -32,8 +32,10 @@ class ProductController extends Controller
                 'vendor_id' => $request->input('vendor_id'),
                 'price_min' => $request->input('price_min'),
                 'price_max' => $request->input('price_max'),
-                'color' => $request->input('color'),
-                'size' => $request->input('size'),
+                'search' => $request->input('search'),
+                'sort' => $request->input('sort'),
+                'date_from' => $request->input('date_from'),
+                'date_to' => $request->input('date_to'),
             ];
 
             // Remove empty filters
