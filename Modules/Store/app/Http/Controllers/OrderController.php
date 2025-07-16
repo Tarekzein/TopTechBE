@@ -120,9 +120,39 @@ class OrderController extends Controller
             ], 422);
         }
 
+        $paymentMethod = $request->input('payment_method');
+        $paymentService = app(\Modules\Store\Services\PaymentService::class);
+        $orderNumber = \Modules\Store\Models\Order::generateOrderNumber();
         try {
-            $order = $this->orderService->createFromCart($request->all(), $cart);
-            return response()->json($order, 201);
+            $paymentResult = null;
+            if ($paymentMethod === 'credit_card') {
+                $paymentData = array_merge($request->all(), [
+                    'merchantReferenceId' => $orderNumber
+                ]);
+                // Use a fake order object for payment session creation
+                $fakeOrder = (object)[
+                    'order_number' => $orderNumber,
+                    'total' => $request->total,
+                    'currency' => $request->currency ?? 'EGP',
+                ];
+                $paymentResult = $paymentService->processPayment(
+                    $fakeOrder,
+                    $paymentMethod,
+                    $paymentData
+                );
+                if ($paymentResult['status'] !== 'success') {
+                    return response()->json(['message' => $paymentResult['message'] ?? 'Payment failed'], 400);
+                }
+            }
+            // Only create the order if payment succeeded or for COD
+            $order = $this->orderService->createFromCart(
+                array_merge($request->all(), ['order_number' => $orderNumber]),
+                $cart
+            );
+            return response()->json([
+                'order' => $order,
+                'payment' => $paymentResult,
+            ], 201);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to create order: ' . $e->getMessage()], 500);
         }

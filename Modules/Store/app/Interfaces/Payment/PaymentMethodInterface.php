@@ -44,6 +44,16 @@ interface PaymentMethodInterface
     public function handleCallback(array $data): array;
 
     /**
+     * Load the payment method configuration from settings
+     */
+    public function loadConfiguration(): void;
+
+    /**
+     * Update the payment method configuration
+     */
+    public function updateConfiguration(array $config): void;
+
+    /**
      * Get the configuration fields needed for this payment method
      * 
      * @return array Array of configuration field definitions

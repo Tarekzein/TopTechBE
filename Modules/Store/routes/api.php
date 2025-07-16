@@ -174,6 +174,11 @@ Route::prefix('store')->group(function () {
             Route::get('methods/{method}/config', [PaymentController::class, 'getMethodConfig']);
             Route::put('methods/{method}/config', [PaymentController::class, 'updateMethodConfig']);
         });
+
+        // Geidea session creation
+        Route::post('geidea/session', [PaymentController::class, 'createGeideaSession']);
+        // Geidea callback
+        Route::post('geidea/callback', [PaymentController::class, 'geideaCallback']);
     });
 });
 

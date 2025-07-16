@@ -34,5 +34,9 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'geidea' => [
+        'public_key' => env('GEIDEA_PUBLIC_KEY'),
+        'api_password' => env('GEIDEA_API_PASSWORD'),
+    ],
 
 ];

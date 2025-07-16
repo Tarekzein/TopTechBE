@@ -46,6 +46,13 @@ class CashOnDeliveryPayment extends AbstractPaymentMethod
         }
     }
 
+    public function loadConfiguration(): void
+    {
+        parent::loadConfiguration();
+    }
+
+    public function updateConfiguration(array $config): void {}
+
     public function getConfigurationFields(): array
     {
         $fields = array_merge(parent::getConfigurationFields(), [

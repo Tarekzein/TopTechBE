@@ -8,18 +8,24 @@ use Illuminate\Http\JsonResponse;
 use Modules\Store\Services\PaymentService;
 use Modules\Store\Models\Order;
 use Modules\Store\Repositories\OrderRepository;
+use Modules\Store\Services\Payment\GeideaPaymentService;
+use Illuminate\Support\Facades\Log;
+use Modules\Store\Services\OrderService;
 
 class PaymentController extends Controller
 {
     protected PaymentService $paymentService;
     protected OrderRepository $orderRepository;
+    protected OrderService $orderService;
 
     public function __construct(
         PaymentService $paymentService,
-        OrderRepository $orderRepository
+        OrderRepository $orderRepository,
+        OrderService $orderService
     ) {
         $this->paymentService = $paymentService;
         $this->orderRepository = $orderRepository;
+        $this->orderService = $orderService;
     }
 
     /**
@@ -154,5 +160,59 @@ class PaymentController extends Controller
                 'message' => $e->getMessage(),
             ], 400);
         }
+    }
+
+    /**
+     * Create Geidea payment session
+     */
+    public function createGeideaSession(Request $request, GeideaPaymentService $geidea)
+    {
+        $request->validate([
+            'amount' => 'required|numeric',
+            'currency' => 'required|string',
+            'merchantReferenceId' => 'required|string',
+            'callbackUrl' => 'required|url',
+            // Add more validation as needed
+        ]);
+        try {
+            $sessionId = $geidea->createSession(
+                $request->amount,
+                $request->currency,
+                $request->merchantReferenceId,
+                $request->callbackUrl,
+                config('services.geidea.api_password'),
+                config('services.geidea.public_key'),
+                $request->except(['amount', 'currency', 'merchantReferenceId', 'callbackUrl'])
+            );
+            return response()->json(['status' => 'success', 'sessionId' => $sessionId]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Handle Geidea payment callback
+     */
+    public function geideaCallback(Request $request)
+    {
+        Log::info('Geidea payment callback received', $request->all());
+        $merchantReferenceId = $request->input('merchantReferenceId');
+        $status = $request->input('status') ?? $request->input('paymentStatus') ?? $request->input('responseCode');
+        $order = $this->orderRepository->findByOrderNumber($merchantReferenceId);
+        if (!$order) {
+            Log::error('Order not found for Geidea callback', ['merchantReferenceId' => $merchantReferenceId]);
+            return response()->json(['status' => 'error', 'message' => 'Order not found'], 404);
+        }
+        // Determine payment status
+        $paidStatuses = ['success', 'paid', '000']; // 000 is Geidea success code
+        $isPaid = in_array(strtolower($status), $paidStatuses) || $status === '000';
+        $newStatus = $isPaid ? 'paid' : 'failed';
+        $this->orderService->updatePaymentStatus($order, $newStatus, $request->input('paymentId') ?? null);
+        Log::info('Order payment status updated from Geidea callback', [
+            'order_number' => $order->order_number,
+            'new_status' => $newStatus,
+            'callback_status' => $status
+        ]);
+        return response()->json(['status' => 'success', 'message' => 'Callback received, order payment status updated']);
     }
 } 

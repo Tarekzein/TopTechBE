@@ -7,6 +7,7 @@ use Modules\Store\Interfaces\Payment\PaymentMethodInterface;
 use Modules\Store\Models\Order;
 use Illuminate\Support\Collection;
 use Modules\Store\Services\Payment\CashOnDeliveryPayment;
+use Modules\Store\Services\Payment\CreditCardPayment;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 
@@ -159,11 +160,19 @@ class PaymentService
             // Register built-in payment methods
             $cod = new CashOnDeliveryPayment($this->settingRepository);
             $this->registerPaymentMethod($cod);
-            
             Log::info('Cash on Delivery payment method registered:', [
                 'identifier' => $cod->getIdentifier(),
                 'enabled' => $cod->isEnabled(),
                 'config' => $cod->getConfigurationFields()
+            ]);
+
+            // Register Geidea payment method
+            $credit_card = new CreditCardPayment($this->settingRepository);
+            $this->registerPaymentMethod($credit_card);
+            Log::info('Geidea payment method registered:', [
+                'identifier' => $credit_card->getIdentifier(),
+                'enabled' => $credit_card->isEnabled(),
+                'config' => $credit_card->getConfigurationFields()
             ]);
 
             // Additional payment methods can be registered here
@@ -285,8 +294,12 @@ class PaymentService
 
     /**
      * Process payment for an order
+     * @param mixed $order Order model or order data (array/stdClass)
+     * @param string $methodIdentifier
+     * @param array $paymentData
+     * @return array
      */
-    public function processPayment(Order $order, string $methodIdentifier, array $paymentData = []): array
+    public function processPayment($order, string $methodIdentifier, array $paymentData = []): array
     {
         $method = $this->getPaymentMethod($methodIdentifier);
 
@@ -326,6 +339,8 @@ class PaymentService
             throw new \InvalidArgumentException("Payment method '{$methodIdentifier}' not found");
         }
 
-        $method->updateConfiguration($config);
+        if (method_exists($method, 'updateConfiguration')) {
+            $method->updateConfiguration($config);
+        }
     }
 }

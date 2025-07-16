@@ -248,18 +248,29 @@ class ProductService
             $product = Product::findOrFail($id);
 
             // Handle main product images
+            $finalImages = [];
+            // 1. Start with existing images to keep
+            if (isset($data['existingImages']) && is_array($data['existingImages'])) {
+                $finalImages = $data['existingImages'];
+            } elseif (isset($product->images) && is_array($product->images)) {
+                $finalImages = $product->images;
+            }
+            // 2. Remove any images in imagesToRemove
+            if (isset($data['imagesToRemove']) && is_array($data['imagesToRemove'])) {
+                $finalImages = array_values(array_diff($finalImages, $data['imagesToRemove']));
+            }
+            // 3. Add new uploaded images
             if (isset($data['images']) && is_array($data['images'])) {
-                $images = [];
                 foreach ($data['images'] as $image) {
                     if ($image instanceof \Illuminate\Http\UploadedFile) {
                         $uploadedImage = $this->cloudImageService->upload($image);
                         if (isset($uploadedImage['secure_url'])) {
-                            $images[] = $uploadedImage['secure_url'];
+                            $finalImages[] = $uploadedImage['secure_url'];
                         }
                     }
                 }
-                $validatedData['images'] = $images;
             }
+            $validatedData['images'] = $finalImages;
 
             $product->update($validatedData);
 
@@ -267,7 +278,6 @@ class ProductService
             if ($product->product_type === 'variable' && isset($data['variations'])) {
                 // Delete existing variations
                 $product->variations()->delete();
-                
                 // Create new variations
                 if (is_array($data['variations'])) {
                     $this->createProductVariations($product, $data['variations'], $data['variation_images'] ?? []);

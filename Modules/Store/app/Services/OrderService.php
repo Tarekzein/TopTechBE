@@ -164,7 +164,7 @@ class OrderService
 
                 // Create the order with validated data
                 $order = $this->orderRepository->create([
-                    'order_number' => Order::generateOrderNumber(),
+                    'order_number' => $data['order_number'] ?? Order::generateOrderNumber(),
                     'user_id' => $cart->user_id,
                     'status' => 'pending',
                     'payment_status' => 'pending',
