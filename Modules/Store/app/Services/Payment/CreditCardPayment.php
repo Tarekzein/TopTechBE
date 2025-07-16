@@ -87,7 +87,8 @@ class CreditCardPayment extends AbstractPaymentMethod
             } else {
                 throw new \InvalidArgumentException('Invalid order data for payment');
             }
-            $callbackUrl = $paymentData['callbackUrl'] ?? config('app.url') . '/api/store/payments/geidea/callback';
+            // $callbackUrl = $paymentData['callbackUrl'] ?? config('app.url') . '/api/store/payments/geidea/callback';
+            $callbackUrl = $paymentData['callbackUrl'] ?? 'https://apitoptech.aiwagroup.org/api/store/payments/geidea/callback';
             $sessionId = $this->geideaService->createSession(
                 $amount,
                 $currency,
