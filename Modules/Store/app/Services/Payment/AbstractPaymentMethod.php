@@ -79,7 +79,8 @@ abstract class AbstractPaymentMethod implements PaymentMethodInterface
             $this->settingRepository->updateOrCreate(
                 'payment.' . $this->getIdentifier() . '.' . $key,
                 $value,
-                'Payment Method Configuration'
+                ucfirst($key) . ' for ' . $this->getIdentifier(),
+                ''
             );
         }
         $this->loadConfiguration();

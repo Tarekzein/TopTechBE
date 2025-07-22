@@ -36,6 +36,7 @@ class Order extends Model
         'completed_at',
         'cancelled_at',
         'refunded_at',
+        'promocode_id',
     ];
 
     protected $casts = [
@@ -176,5 +177,13 @@ class Order extends Model
     public function shippingAddress(): BelongsTo
     {
         return $this->belongsTo(ShippingAddress::class);
+    }
+
+    /**
+     * Get the promocode applied to the order.
+     */
+    public function promocode()
+    {
+        return $this->belongsTo(\Modules\Store\Models\PromoCode::class, 'promocode_id');
     }
 } 

@@ -16,6 +16,7 @@ class StoreDatabaseSeeder extends Seeder
             StoreSettingsSeeder::class,
             StoreCategoriesSeeder::class,
             ProductSeeder::class,
+            PromoCodeSeeder::class,
         ]);
     }
 }

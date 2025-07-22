@@ -180,6 +180,9 @@ Route::prefix('store')->group(function () {
         // Geidea callback
         Route::post('geidea/callback', [PaymentController::class, 'geideaCallback']);
     });
+
+    // PromoCode validation route
+    Route::get('promocodes/validate', [\Modules\Store\Http\Controllers\PromoCodeController::class, 'validateCode']);
 });
 
 Route::get('/debug-auth', function (Request $request) {

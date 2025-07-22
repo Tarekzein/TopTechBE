@@ -120,9 +120,31 @@ class OrderService
                 });
 
                 $cartSubtotal = $cartItems->sum('subtotal');
-                $cartTax = round($cartSubtotal * 0.07, 2); // 7% tax
+                $cartTax = round($cartSubtotal * 0.14, 2); // 14% tax
                 $shippingCost = round($data['shipping_cost'] ?? 0, 2);
                 $cartTotal = round($cartSubtotal + $cartTax + $shippingCost, 2);
+
+                // Promo code logic
+                $promocode = null;
+                $discount = 0;
+                if (!empty($data['promocode'])) {
+                    $promocode = \Modules\Store\Models\PromoCode::where('code', $data['promocode'])->first();
+                    if (!$promocode) {
+                        throw new \Exception('Promo code not found.');
+                    }
+                    if (!$promocode->isActive()) {
+                        throw new \Exception('Promo code is not active or expired.');
+                    }
+                    if ($promocode->min_order_total && $cartTotal < $promocode->min_order_total) {
+                        throw new \Exception('Order total is less than minimum required for this promo code.');
+                    }
+                    $userId = $cart->user_id;
+                    if ($userId && !$promocode->canBeUsedBy($userId)) {
+                        throw new \Exception('Promo code usage limit reached for this user.');
+                    }
+                    $discount = $promocode->calculateDiscount($cartTotal);
+                    $cartTotal = max(0, $cartTotal - $discount);
+                }
 
                 // Log the values for debugging
                 Log::info('Order totals calculation', [
@@ -134,7 +156,9 @@ class OrderService
                     'cart_total' => $cartTotal,
                     'provided_total' => $data['total'],
                     'cart_items' => $cartItems->toArray(),
-                    'meta_prices' => $metaPrices->toArray()
+                    'meta_prices' => $metaPrices->toArray(),
+                    'discount' => $discount,
+                    'promocode' => $promocode ? $promocode->code : null
                 ]);
 
                 // Validate totals with a small tolerance for floating point arithmetic
@@ -173,17 +197,32 @@ class OrderService
                     'shipping_cost' => $shippingCost,
                     'subtotal' => $cartSubtotal,
                     'tax' => $cartTax,
+                    'discount' => $discount,
                     'total' => $cartTotal,
                     'currency' => $data['currency'] ?? 'USD',
                     'billing_address_id' => $data['billing_address_id'],
                     'shipping_address_id' => $data['shipping_address_id'],
                     'notes' => $data['notes'] ?? null,
+                    'promocode_id' => $promocode ? $promocode->id : null,
                     'meta_data' => [
                         'cart_items' => $cartItems->toArray(),
                         'original_cart' => $cart->toArray(),
-                        'meta_prices' => $metaPrices->toArray()
+                        'meta_prices' => $metaPrices->toArray(),
+                        'applied_promocode' => $promocode ? $promocode->code : null,
+                        'applied_discount' => $discount,
                     ]
                 ]);
+
+                // Increment promocode usage if applied
+                if ($promocode) {
+                    $promocode->increment('used');
+                    \Modules\Store\Models\PromoCodeUsage::create([
+                        'user_id' => $cart->user_id,
+                        'promocode_id' => $promocode->id,
+                        'order_id' => $order->id,
+                        'used_at' => now(),
+                    ]);
+                }
 
                 // Create order items using the validated cart items
                 foreach ($cartItems as $item) {
