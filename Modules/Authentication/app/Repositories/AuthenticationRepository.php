@@ -95,7 +95,7 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
         try {
             DB::beginTransaction();
             
-            $user->tokens()->delete();
+            $user->currentAccessToken()->delete();
             
             DB::commit();
             return ['message' => 'Logged out successfully'];
