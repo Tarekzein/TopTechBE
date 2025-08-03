@@ -11,6 +11,7 @@ use Modules\Store\Services\CartService;
 use Modules\Store\Services\WishlistService;
 use Illuminate\Support\Facades\DB;
 use Exception;
+use Modules\Authentication\Events\NewUser;
 
 class AuthenticationRepository implements AuthenticationRepositoryInterface
 {
@@ -38,6 +39,9 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
             $user->load('roles');
             $token = $user->createToken('auth_token')->plainTextToken;
             
+            // Dispatch NewUser event to send welcome email
+            event(new NewUser($user));
+            
             DB::commit();
             return ['user' => $user, 'token' => $token];
         } catch (Exception $e) {
@@ -55,6 +59,9 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
             $user->assignRole('vendor');
             $user->load('roles');
             $token = $user->createToken('auth_token')->plainTextToken;
+            
+            // Dispatch NewUser event to send welcome email
+            event(new NewUser($user));
             
             DB::commit();
             return ['user' => $user, 'token' => $token];

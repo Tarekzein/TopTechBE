@@ -3,6 +3,8 @@
 namespace Modules\Authentication\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Modules\Authentication\Events\NewUser;
+use Modules\Authentication\Listeners\SendWelcomeEmail;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -11,7 +13,11 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        NewUser::class => [
+            SendWelcomeEmail::class,
+        ],
+    ];
 
     /**
      * Indicates if events should be discovered.

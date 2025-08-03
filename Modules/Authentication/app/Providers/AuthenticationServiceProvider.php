@@ -49,7 +49,9 @@ class AuthenticationServiceProvider extends ServiceProvider
      */
     protected function registerCommands(): void
     {
-        // $this->commands([]);
+        $this->commands([
+            \Modules\Authentication\Console\Commands\SendTestWelcomeEmail::class,
+        ]);
     }
 
     /**
