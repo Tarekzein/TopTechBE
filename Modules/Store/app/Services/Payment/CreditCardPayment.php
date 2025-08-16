@@ -51,9 +51,10 @@ class CreditCardPayment extends AbstractPaymentMethod
         }
     }
 
-    public function loadConfiguration(): void {}
-
-    public function updateConfiguration(array $config): void {}
+    public function updateConfiguration(array $config): void
+    {
+        parent::updateConfiguration($config);
+    }
 
     public function getConfigurationFields(): array
     {
@@ -79,15 +80,35 @@ class CreditCardPayment extends AbstractPaymentMethod
             if (is_object($order)) {
                 $merchantReferenceId = $order->order_number ?? $order->id;
                 $amount = $order->total;
-                $currency = $order->currency ?? 'EGP';
+                $currency = strtoupper($order->currency ?? 'EGP');
             } elseif (is_array($order)) {
                 $merchantReferenceId = $order['order_number'] ?? null;
                 $amount = $order['total'] ?? null;
-                $currency = $order['currency'] ?? 'EGP';
+                $currency = strtoupper($order['currency'] ?? 'EGP');
             } else {
                 throw new \InvalidArgumentException('Invalid order data for payment');
             }
-            $callbackUrl = $paymentData['callbackUrl'] ?? config('app.url') . '/api/store/payments/geidea/callback';
+            
+            // Log the payment data for debugging
+            Log::info('Geidea payment processing:', [
+                'orderType' => is_object($order) ? get_class($order) : gettype($order),
+                'merchantReferenceId' => $merchantReferenceId,
+                'amount' => $amount,
+                'amountType' => gettype($amount),
+                'currency' => $currency,
+                'currencyType' => gettype($currency),
+                'paymentData' => $paymentData
+            ]);
+            
+            $callbackUrl = config('app.url') . '/api/store/payments/geidea/callback';
+            
+            // Log the API credentials (without exposing sensitive data)
+            Log::info('Geidea API credentials check:', [
+                'hasApiPassword' => !empty(config('services.geidea.api_password')),
+                'hasPublicKey' => !empty(config('services.geidea.public_key')),
+                'callbackUrl' => $callbackUrl
+            ]);
+            
             $sessionId = $this->geideaService->createSession(
                 $amount,
                 $currency,
