@@ -77,49 +77,59 @@ class GeideaPaymentService
 
         // Try different amount formats - some payment gateways are very specific
         $amountFormats = $this->getAmountFormats($amount, $currency);
+        $apiEndpoints = $this->getApiEndpoints();
         
         foreach ($amountFormats as $formatName => $formattedAmount) {
-            try {
-                Log::info("Trying amount format: {$formatName}", [
-                    'amount' => $formattedAmount,
-                    'formatName' => $formatName
-                ]);
-                
-                $result = $this->attemptCreateSession(
-                    $formattedAmount,
-                    $currency,
-                    $merchantReferenceId,
-                    $callbackUrl,
-                    $apiPassword,
-                    $merchantPublicKey,
-                    $otherParams
-                );
-                
-                Log::info("Successfully created session with format: {$formatName}", [
-                    'amount' => $formattedAmount,
-                    'formatName' => $formatName
-                ]);
-                
-                return $result;
-                
-            } catch (\Exception $e) {
-                Log::warning("Failed to create session with format: {$formatName}", [
-                    'amount' => $formattedAmount,
-                    'formatName' => $formatName,
-                    'error' => $e->getMessage()
-                ]);
-                
-                // If this is the last format to try, throw the exception
-                if ($formatName === array_key_last($amountFormats)) {
-                    throw $e;
+            foreach ($apiEndpoints as $endpointName => $endpointUrl) {
+                try {
+                    Log::info("Trying amount format: {$formatName} with endpoint: {$endpointName}", [
+                        'amount' => $formattedAmount,
+                        'formatName' => $formatName,
+                        'endpoint' => $endpointName,
+                        'url' => $endpointUrl
+                    ]);
+                    
+                    $result = $this->attemptCreateSession(
+                        $formattedAmount,
+                        $currency,
+                        $merchantReferenceId,
+                        $callbackUrl,
+                        $apiPassword,
+                        $merchantPublicKey,
+                        $otherParams,
+                        $endpointUrl,
+                        $endpointName
+                    );
+                    
+                    Log::info("Successfully created session with format: {$formatName} and endpoint: {$endpointName}", [
+                        'amount' => $formattedAmount,
+                        'formatName' => $formatName,
+                        'endpoint' => $endpointName
+                    ]);
+                    
+                    return $result;
+                    
+                } catch (\Exception $e) {
+                    Log::warning("Failed to create session with format: {$formatName} and endpoint: {$endpointName}", [
+                        'amount' => $formattedAmount,
+                        'formatName' => $formatName,
+                        'endpoint' => $endpointName,
+                        'url' => $endpointUrl,
+                        'error' => $e->getMessage()
+                    ]);
+                    
+                    // If this is the last combination to try, throw the exception
+                    if ($formatName === array_key_last($amountFormats) && $endpointName === array_key_last($apiEndpoints)) {
+                        throw $e;
+                    }
+                    
+                    // Continue to next combination
+                    continue;
                 }
-                
-                // Continue to next format
-                continue;
             }
         }
         
-        throw new \Exception('All amount formats failed for Geidea API');
+        throw new \Exception('All amount formats and API endpoints failed for Geidea API');
     }
     
     /**
@@ -168,9 +178,22 @@ class GeideaPaymentService
     }
     
     /**
+     * Get different API endpoint options to try
+     */
+    private function getApiEndpoints()
+    {
+        return [
+            'v2_direct_session' => 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session',
+            'v2_session' => 'https://api.merchant.geidea.net/payment-intent/api/v2/session',
+            'v1_session' => 'https://api.merchant.geidea.net/payment-intent/api/v1/session',
+            'legacy_session' => 'https://api.merchant.geidea.net/payment-intent/session'
+        ];
+    }
+    
+    /**
      * Attempt to create a session with a specific amount format
      */
-    private function attemptCreateSession($amount, $currency, $merchantReferenceId, $callbackUrl, $apiPassword, $merchantPublicKey, $otherParams = [])
+    private function attemptCreateSession($amount, $currency, $merchantReferenceId, $callbackUrl, $apiPassword, $merchantPublicKey, $otherParams = [], $url = null, $endpointName = null)
     {
         // Try different timestamp formats - some payment gateways are very specific
         $timestampFormats = [
@@ -198,6 +221,25 @@ class GeideaPaymentService
                     'callbackUrl' => $callbackUrl,
                 ], $otherParams);
 
+                // Clean the payload to only include essential Geidea fields
+                // Remove any extra fields that might be causing validation issues
+                $cleanData = [
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'merchantReferenceId' => $merchantReferenceId,
+                    'timestamp' => $timestamp,
+                    'signature' => $signature,
+                    'callbackUrl' => $callbackUrl,
+                ];
+                
+                // Add additional commonly required fields for payment gateways
+                // These might be required by Geidea even if not documented
+                $cleanData['merchantId'] = $merchantPublicKey;
+                $cleanData['apiKey'] = $apiPassword;
+                $cleanData['orderId'] = $merchantReferenceId;
+                $cleanData['orderAmount'] = $amount;
+                $cleanData['orderCurrency'] = $currency;
+
                 Log::info('Geidea API request data:', [
                     'amount' => $amount,
                     'amountType' => gettype($amount),
@@ -205,15 +247,16 @@ class GeideaPaymentService
                     'merchantReferenceId' => $merchantReferenceId,
                     'timestamp' => $timestamp,
                     'timestampFormat' => $formatName,
-                    'url' => 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session'
+                    'url' => $url ?? 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session'
                 ]);
 
-                $url = 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session';
+                // Use the provided URL if available, otherwise use the default
+                $finalUrl = $url ?? 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session';
 
                 // Log the complete request payload for debugging
                 Log::info('Complete Geidea API request payload:', [
-                    'url' => $url,
-                    'payload' => $data,
+                    'url' => $finalUrl,
+                    'payload' => $cleanData,
                     'headers' => [
                         'Authorization' => 'Basic ' . base64_encode($merchantPublicKey . ':' . $apiPassword),
                         'Content-Type' => 'application/json'
@@ -228,32 +271,39 @@ class GeideaPaymentService
                             'User-Agent' => 'ATech-Payment-Service/1.0'
                         ])
                         ->timeout(30) // Add timeout
-                        ->post($url, $data);
+                        ->post($finalUrl, $cleanData);
 
                     Log::info('Geidea API response received:', [
                         'statusCode' => $response->status(),
                         'responseCode' => $response->json('responseCode'),
                         'responseMessage' => $response->json('detailedResponseMessage'),
-                        'timestampFormat' => $formatName
+                        'timestampFormat' => $formatName,
+                        'endpoint' => $endpointName
                     ]);
 
                     if ($response->successful() && $response->json('responseCode') === '000') {
-                        Log::info("Successfully created session with timestamp format: {$formatName}");
+                        Log::info("Successfully created session with timestamp format: {$formatName} and endpoint: {$endpointName}");
                         return $response->json('session.id');
                     } else {
                         $errorMessage = $response->json('detailedResponseMessage') ?? 'Geidea session creation failed';
                         $responseCode = $response->json('responseCode');
+                        $detailedResponseCode = $response->json('detailedResponseCode');
+                        $language = $response->json('language');
                         
-                        Log::warning("Failed with timestamp format: {$formatName}", [
+                        Log::warning("Failed with timestamp format: {$formatName} and endpoint: {$endpointName}", [
                             'responseCode' => $responseCode,
+                            'detailedResponseCode' => $detailedResponseCode,
                             'errorMessage' => $errorMessage,
+                            'language' => $language,
                             'fullResponse' => $response->json(),
-                            'statusCode' => $response->status()
+                            'statusCode' => $response->status(),
+                            'requestPayload' => $cleanData,
+                            'endpoint' => $endpointName
                         ]);
                         
                         // If this is the last timestamp format to try, throw the exception
                         if ($formatName === array_key_last($timestampFormats)) {
-                            throw new \Exception("Geidea API Error (Code: {$responseCode}): {$errorMessage}");
+                            throw new \Exception("Geidea API Error (Code: {$responseCode}, Detailed: {$detailedResponseCode}): {$errorMessage}");
                         }
                         
                         // Continue to next timestamp format
@@ -263,7 +313,7 @@ class GeideaPaymentService
                     if ($e instanceof \Illuminate\Http\Client\ConnectionException) {
                         Log::error('Geidea API connection error:', [
                             'error' => $e->getMessage(),
-                            'url' => $url
+                            'url' => $finalUrl
                         ]);
                         throw new \Exception('Unable to connect to Geidea payment service. Please try again later.');
                     }
