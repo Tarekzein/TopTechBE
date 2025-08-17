@@ -9,14 +9,36 @@ class GeideaPaymentService
 {
     public function generateSignature($merchantPublicKey, $orderAmount, $orderCurrency, $merchantReferenceId, $apiPassword, $timestamp)
     {
+        // Validate input parameters
+        if (empty($merchantPublicKey) || empty($apiPassword)) {
+            throw new \InvalidArgumentException('Merchant public key and API password are required for signature generation');
+        }
+        
+        if (empty($orderAmount) || !is_numeric($orderAmount)) {
+            throw new \InvalidArgumentException('Order amount must be a valid number');
+        }
+        
+        if (empty($orderCurrency) || strlen($orderCurrency) !== 3) {
+            throw new \InvalidArgumentException('Order currency must be a 3-letter ISO code');
+        }
+        
+        if (empty($merchantReferenceId)) {
+            throw new \InvalidArgumentException('Merchant reference ID is required');
+        }
+        
+        if (empty($timestamp)) {
+            throw new \InvalidArgumentException('Timestamp is required');
+        }
+        
         // Ensure all parameters are properly formatted
         $merchantPublicKey = (string) $merchantPublicKey;
-        $amountStr = (string) $orderAmount;
+        // Format amount with 2 decimal places as per Geidea documentation
+        $amountStr = number_format((float) $orderAmount, 2, '.', '');
         $orderCurrency = (string) $orderCurrency;
         $merchantReferenceId = (string) $merchantReferenceId;
         $timestamp = (string) $timestamp;
         
-        // Create the data string for signature
+        // Create the data string for signature as per Geidea documentation
         $data = "{$merchantPublicKey}{$amountStr}{$orderCurrency}{$merchantReferenceId}{$timestamp}";
         
         Log::info('Geidea signature generation:', [
@@ -25,7 +47,8 @@ class GeideaPaymentService
             'orderCurrency' => $orderCurrency,
             'merchantReferenceId' => $merchantReferenceId,
             'timestamp' => $timestamp,
-            'dataString' => $data
+            'dataString' => $data,
+            'dataStringLength' => strlen($data)
         ]);
         
         $hash = hash_hmac('sha256', $data, $apiPassword, true);
@@ -33,7 +56,9 @@ class GeideaPaymentService
         
         Log::info('Geidea signature generated:', [
             'signature' => $signature,
-            'signatureLength' => strlen($signature)
+            'signatureLength' => strlen($signature),
+            'hashAlgorithm' => 'sha256',
+            'encoding' => 'base64'
         ]);
         
         return $signature;
@@ -74,6 +99,16 @@ class GeideaPaymentService
         if (empty($apiPassword) || empty($merchantPublicKey)) {
             throw new \Exception('Geidea API credentials (apiPassword or merchantPublicKey) are not set. Please check your .env and config/services.php.');
         }
+        
+        Log::info('Geidea createSession called with parameters:', [
+            'amount' => $amount,
+            'currency' => $currency,
+            'merchantReferenceId' => $merchantReferenceId,
+            'callbackUrl' => $callbackUrl,
+            'merchantPublicKey' => substr($merchantPublicKey, 0, 10) . '...', // Log partial key for security
+            'apiPasswordLength' => strlen($apiPassword),
+            'otherParams' => $otherParams
+        ]);
 
         // Try different amount formats - some payment gateways are very specific
         $amountFormats = $this->getAmountFormats($amount, $currency);
@@ -134,44 +169,29 @@ class GeideaPaymentService
     
     /**
      * Get different amount formats to try with the payment gateway
+     * Geidea documentation specifies: "The format is a double - a number with 2 digits after the decimal point. For example 19.99"
      */
     private function getAmountFormats($amount, $currency)
     {
         $formats = [];
         
-        switch (strtoupper($currency)) {
-            case 'EGP':
-                // For EGP, try multiple formats
-                $formats = [
-                    'piastres' => (int) round($amount * 100),
-                    'decimal_2' => round($amount, 2),
-                    'decimal_0' => (int) round($amount),
-                    'string_piastres' => (string) round($amount * 100),
-                    'string_decimal' => (string) round($amount, 2)
-                ];
-                break;
-                
-            case 'USD':
-                // For USD, try multiple formats
-                $formats = [
-                    'cents' => (int) round($amount * 100),
-                    'decimal_2' => round($amount, 2),
-                    'decimal_0' => (int) round($amount),
-                    'string_cents' => (string) round($amount * 100),
-                    'string_decimal' => (string) round($amount, 2)
-                ];
-                break;
-                
-            default:
-                // For other currencies
-                $formats = [
-                    'smallest_unit' => (int) round($amount * 100),
-                    'decimal_2' => round($amount, 2),
-                    'decimal_0' => (int) round($amount),
-                    'string_smallest' => (string) round($amount * 100),
-                    'string_decimal' => (string) round($amount, 2)
-                ];
-                break;
+        // Geidea expects a double with 2 decimal places
+        $formats = [
+            'geidea_format' => round($amount, 2), // Primary format as per Geidea docs
+            'string_format' => (string) round($amount, 2), // String version
+            'decimal_2' => number_format($amount, 2, '.', ''), // Formatted with number_format
+        ];
+        
+        // For EGP, also try piastres format as some implementations might expect it
+        if (strtoupper($currency) === 'EGP') {
+            $formats['piastres'] = (int) round($amount * 100);
+            $formats['string_piastres'] = (string) round($amount * 100);
+        }
+        
+        // For USD, also try cents format
+        if (strtoupper($currency) === 'USD') {
+            $formats['cents'] = (int) round($amount * 100);
+            $formats['string_cents'] = (string) round($amount * 100);
         }
         
         return $formats;
@@ -179,14 +199,14 @@ class GeideaPaymentService
     
     /**
      * Get different API endpoint options to try
+     * Based on Geidea documentation: https://api.merchant.geidea.net/payment-intent/api/v2/direct/session
      */
     private function getApiEndpoints()
     {
         return [
             'v2_direct_session' => 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session',
             'v2_session' => 'https://api.merchant.geidea.net/payment-intent/api/v2/session',
-            'v1_session' => 'https://api.merchant.geidea.net/payment-intent/api/v1/session',
-            'legacy_session' => 'https://api.merchant.geidea.net/payment-intent/session'
+            'v1_session' => 'https://api.merchant.geidea.net/payment-intent/api/v1/session'
         ];
     }
     
@@ -195,12 +215,12 @@ class GeideaPaymentService
      */
     private function attemptCreateSession($amount, $currency, $merchantReferenceId, $callbackUrl, $apiPassword, $merchantPublicKey, $otherParams = [], $url = null, $endpointName = null)
     {
-        // Try different timestamp formats - some payment gateways are very specific
+        // Try different timestamp formats - Geidea documentation shows Y/m/d H:i:s format
         $timestampFormats = [
+            'geidea_format' => now()->format('Y/m/d H:i:s'),
             'iso8601' => now()->toISOString(),
             'unix_timestamp' => (string) now()->timestamp,
-            'mysql_format' => now()->format('Y-m-d H:i:s'),
-            'custom_format' => now()->format('Y/m/d H:i:s')
+            'mysql_format' => now()->format('Y-m-d H:i:s')
         ];
         
         foreach ($timestampFormats as $formatName => $timestamp) {
@@ -210,35 +230,57 @@ class GeideaPaymentService
                     'formatName' => $formatName
                 ]);
                 
-                $signature = $this->generateSignature($merchantPublicKey, $amount, $currency, $merchantReferenceId, $apiPassword, $timestamp);
+        $signature = $this->generateSignature($merchantPublicKey, $amount, $currency, $merchantReferenceId, $apiPassword, $timestamp);
 
-                $data = array_merge([
-                    'amount' => $amount,
-                    'currency' => $currency,
-                    'merchantReferenceId' => $merchantReferenceId,
-                    'timestamp' => $timestamp,
-                    'signature' => $signature,
-                    'callbackUrl' => $callbackUrl,
-                ], $otherParams);
+        $data = array_merge([
+            'amount' => $amount,
+            'currency' => $currency,
+            'merchantReferenceId' => $merchantReferenceId,
+            'timestamp' => $timestamp,
+            'signature' => $signature,
+            'callbackUrl' => $callbackUrl,
+        ], $otherParams);
 
-                // Clean the payload to only include essential Geidea fields
-                // Remove any extra fields that might be causing validation issues
+                // Create payload according to Geidea documentation
                 $cleanData = [
                     'amount' => $amount,
                     'currency' => $currency,
-                    'merchantReferenceId' => $merchantReferenceId,
                     'timestamp' => $timestamp,
+                    'merchantReferenceId' => $merchantReferenceId,
                     'signature' => $signature,
                     'callbackUrl' => $callbackUrl,
                 ];
                 
-                // Add additional commonly required fields for payment gateways
-                // These might be required by Geidea even if not documented
-                $cleanData['merchantId'] = $merchantPublicKey;
-                $cleanData['apiKey'] = $apiPassword;
-                $cleanData['orderId'] = $merchantReferenceId;
-                $cleanData['orderAmount'] = $amount;
-                $cleanData['orderCurrency'] = $currency;
+                // Add optional parameters if provided
+                if (isset($otherParams['language'])) {
+                    $cleanData['language'] = $otherParams['language'];
+                }
+                
+                if (isset($otherParams['paymentOperation'])) {
+                    $cleanData['paymentOperation'] = $otherParams['paymentOperation'];
+                }
+                
+                if (isset($otherParams['returnUrl'])) {
+                    $cleanData['returnUrl'] = $otherParams['returnUrl'];
+                }
+                
+                if (isset($otherParams['cardOnFile'])) {
+                    $cleanData['cardOnFile'] = $otherParams['cardOnFile'];
+                }
+                
+                if (isset($otherParams['tokenId'])) {
+                    $cleanData['tokenId'] = $otherParams['tokenId'];
+                }
+                
+                // Add customer information if provided
+                if (isset($otherParams['customer'])) {
+                    $cleanData['customer'] = $otherParams['customer'];
+                }
+                
+                // Add order information if provided
+                if (isset($otherParams['order'])) {
+                    $cleanData['order'] = $otherParams['order'];
+                }
 
                 Log::info('Geidea API request data:', [
                     'amount' => $amount,
@@ -273,29 +315,86 @@ class GeideaPaymentService
                         ->timeout(30) // Add timeout
                         ->post($finalUrl, $cleanData);
 
-                    Log::info('Geidea API response received:', [
+                    // Log the raw response for debugging
+                    Log::info('Geidea API raw response:', [
                         'statusCode' => $response->status(),
-                        'responseCode' => $response->json('responseCode'),
-                        'responseMessage' => $response->json('detailedResponseMessage'),
+                        'headers' => $response->headers(),
+                        'body' => $response->body(),
                         'timestampFormat' => $formatName,
                         'endpoint' => $endpointName
                     ]);
 
-                    if ($response->successful() && $response->json('responseCode') === '000') {
+                    // Check if we got a valid JSON response
+                    $responseData = $response->json();
+                    
+                    // Handle case where response is not valid JSON
+                    if (json_last_error() !== JSON_ERROR_NONE) {
+                        Log::error('Geidea API returned invalid JSON:', [
+                            'jsonError' => json_last_error_msg(),
+                            'rawBody' => $response->body(),
+                            'statusCode' => $response->status(),
+                            'timestampFormat' => $formatName,
+                            'endpoint' => $endpointName
+                        ]);
+                        
+                        // If this is the last timestamp format to try, throw the exception
+                        if ($formatName === array_key_last($timestampFormats)) {
+                            throw new \Exception('Geidea API returned invalid JSON response: ' . json_last_error_msg());
+                        }
+                        
+                        // Continue to next timestamp format
+                        continue;
+                    }
+                    
+                    Log::info('Geidea API parsed response:', [
+                        'statusCode' => $response->status(),
+                        'responseData' => $responseData,
+                        'responseCode' => $responseData['responseCode'] ?? 'N/A',
+                        'responseMessage' => $responseData['detailedResponseMessage'] ?? $responseData['message'] ?? 'N/A',
+                        'timestampFormat' => $formatName,
+                        'endpoint' => $endpointName
+                    ]);
+
+                    if ($response->successful() && isset($responseData['responseCode']) && $responseData['responseCode'] === '000') {
                         Log::info("Successfully created session with timestamp format: {$formatName} and endpoint: {$endpointName}");
-                        return $response->json('session.id');
+                        
+                        // Extract session ID according to Geidea documentation
+                        $sessionId = null;
+                        if (isset($responseData['session']['id'])) {
+                            $sessionId = $responseData['session']['id'];
+                        } elseif (isset($responseData['sessionId'])) {
+                            $sessionId = $responseData['sessionId'];
+                        }
+                        
+                        if ($sessionId) {
+                            Log::info('Geidea session created successfully:', [
+                                'sessionId' => $sessionId,
+                                'responseCode' => $responseData['responseCode'],
+                                'responseMessage' => $responseData['responseMessage'] ?? 'Success'
+                            ]);
+                            return $sessionId;
+                        } else {
+                            Log::error('Geidea session created but no session ID found in response:', [
+                                'responseData' => $responseData
+                            ]);
+                            throw new \Exception('Session created but no session ID returned from Geidea API');
+                        }
                     } else {
-                        $errorMessage = $response->json('detailedResponseMessage') ?? 'Geidea session creation failed';
-                        $responseCode = $response->json('responseCode');
-                        $detailedResponseCode = $response->json('detailedResponseCode');
-                        $language = $response->json('language');
+                        // Extract error information with better fallbacks
+                        $errorMessage = $responseData['detailedResponseMessage'] ?? 
+                                       $responseData['message'] ?? 
+                                       $responseData['error'] ?? 
+                                       'Geidea session creation failed';
+                        $responseCode = $responseData['responseCode'] ?? $responseData['code'] ?? 'N/A';
+                        $detailedResponseCode = $responseData['detailedResponseCode'] ?? $responseData['errorCode'] ?? 'N/A';
+                        $language = $responseData['language'] ?? 'N/A';
                         
                         Log::warning("Failed with timestamp format: {$formatName} and endpoint: {$endpointName}", [
                             'responseCode' => $responseCode,
                             'detailedResponseCode' => $detailedResponseCode,
                             'errorMessage' => $errorMessage,
                             'language' => $language,
-                            'fullResponse' => $response->json(),
+                            'fullResponse' => $responseData,
                             'statusCode' => $response->status(),
                             'requestPayload' => $cleanData,
                             'endpoint' => $endpointName
@@ -310,12 +409,30 @@ class GeideaPaymentService
                         continue;
                     }
                 } catch (\Exception $e) {
+                    Log::error('Geidea API request exception:', [
+                        'error' => $e->getMessage(),
+                        'errorType' => get_class($e),
+                        'url' => $finalUrl,
+                        'timestampFormat' => $formatName,
+                        'endpoint' => $endpointName,
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    
                     if ($e instanceof \Illuminate\Http\Client\ConnectionException) {
                         Log::error('Geidea API connection error:', [
                             'error' => $e->getMessage(),
-                            'url' => $finalUrl
+                            'url' => $finalUrl,
+                            'timestampFormat' => $formatName,
+                            'endpoint' => $endpointName
                         ]);
-                        throw new \Exception('Unable to connect to Geidea payment service. Please try again later.');
+                        
+                        // If this is the last timestamp format to try, throw the exception
+                        if ($formatName === array_key_last($timestampFormats)) {
+                            throw new \Exception('Unable to connect to Geidea payment service. Please try again later.');
+                        }
+                        
+                        // Continue to next timestamp format
+                        continue;
                     }
                     
                     // If this is the last timestamp format to try, throw the exception
@@ -431,5 +548,93 @@ class GeideaPaymentService
     private function normalizeCurrency($currency)
     {
         return strtoupper($currency);
+    }
+    
+    /**
+     * Get the checkout URL for the specified environment
+     * Based on Geidea documentation:
+     * - KSA Environment: https://www.ksamerchant.geidea.net/hpp/checkout/
+     * - Egypt Environment: https://www.merchant.geidea.net/hpp/checkout/
+     * - UAE Environment: https://payments.geidea.ae/hpp/checkout/
+     */
+    public function getCheckoutUrl($sessionId, $environment = 'egypt')
+    {
+        $baseUrls = [
+            'ksa' => 'https://www.ksamerchant.geidea.net/hpp/checkout/',
+            'egypt' => 'https://www.merchant.geidea.net/hpp/checkout/',
+            'uae' => 'https://payments.geidea.ae/hpp/checkout/'
+        ];
+        
+        $baseUrl = $baseUrls[strtolower($environment)] ?? $baseUrls['egypt'];
+        
+        return $baseUrl . $sessionId;
+    }
+    
+    /**
+     * Get the JavaScript library URL for the specified environment
+     * Based on Geidea documentation:
+     * - KSA Environment: https://www.ksamerchant.geidea.net/hpp/geideaCheckout.min.js
+     * - Egypt Environment: https://www.merchant.geidea.net/hpp/geideaCheckout.min.js
+     * - UAE Environment: https://payments.geidea.ae/hpp/geideaCheckout.min.js
+     */
+    public function getJavaScriptUrl($environment = 'egypt')
+    {
+        $urls = [
+            'ksa' => 'https://www.ksamerchant.geidea.net/hpp/geideaCheckout.min.js',
+            'egypt' => 'https://www.merchant.geidea.net/hpp/geideaCheckout.min.js',
+            'uae' => 'https://payments.geidea.ae/hpp/geideaCheckout.min.js'
+        ];
+        
+        return $urls[strtolower($environment)] ?? $urls['egypt'];
+    }
+    
+    /**
+     * Validate callback response from Geidea
+     * This method can be used to validate the callback data received from Geidea
+     */
+    public function validateCallback($callbackData, $apiPassword, $merchantPublicKey)
+    {
+        try {
+            // Extract required fields from callback
+            $responseCode = $callbackData['responseCode'] ?? null;
+            $responseMessage = $callbackData['responseMessage'] ?? null;
+            $detailedResponseCode = $callbackData['detailedResponseCode'] ?? null;
+            $detailedResponseMessage = $callbackData['detailedResponseMessage'] ?? null;
+            $orderId = $callbackData['orderId'] ?? null;
+            $reference = $callbackData['reference'] ?? null;
+            $signature = $callbackData['signature'] ?? null;
+            
+            Log::info('Geidea callback validation:', [
+                'responseCode' => $responseCode,
+                'responseMessage' => $responseMessage,
+                'detailedResponseCode' => $detailedResponseCode,
+                'detailedResponseMessage' => $detailedResponseMessage,
+                'orderId' => $orderId,
+                'reference' => $reference,
+                'hasSignature' => !empty($signature)
+            ]);
+            
+            // Check if payment was successful
+            $isSuccessful = ($responseCode === '000' && $detailedResponseCode === '000');
+            
+            return [
+                'isSuccessful' => $isSuccessful,
+                'responseCode' => $responseCode,
+                'responseMessage' => $responseMessage,
+                'detailedResponseCode' => $detailedResponseCode,
+                'detailedResponseMessage' => $detailedResponseMessage,
+                'orderId' => $orderId,
+                'reference' => $reference,
+                'signature' => $signature
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Error validating Geidea callback:', [
+                'error' => $e->getMessage(),
+                'callbackData' => $callbackData
+            ]);
+            
+            throw new \Exception('Failed to validate Geidea callback: ' . $e->getMessage());
+        }
     }
 } 
