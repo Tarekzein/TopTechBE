@@ -55,14 +55,16 @@ class GeideaPaymentService
             throw new \InvalidArgumentException('Currency must be a valid 3-letter uppercase ISO code');
         }
         
+        // Some payment gateways are very strict about currency codes
+        // Try to normalize the currency if needed
+        $currency = $this->normalizeCurrency($currency);
+        
         if (empty($merchantReferenceId)) {
             throw new \InvalidArgumentException('Merchant reference ID is required');
         }
         
-        // Validate merchant reference ID format (alphanumeric and hyphens only, max 50 chars)
-        if (!preg_match('/^[a-zA-Z0-9\-_]{1,50}$/', $merchantReferenceId)) {
-            throw new \InvalidArgumentException('Merchant reference ID must be 1-50 characters long and contain only letters, numbers, hyphens, and underscores');
-        }
+        // Clean and validate merchant reference ID
+        $merchantReferenceId = $this->cleanMerchantReferenceId($merchantReferenceId);
         
         if (empty($callbackUrl) || !filter_var($callbackUrl, FILTER_VALIDATE_URL)) {
             throw new \InvalidArgumentException('Valid callback URL is required');
@@ -73,70 +75,220 @@ class GeideaPaymentService
             throw new \Exception('Geidea API credentials (apiPassword or merchantPublicKey) are not set. Please check your .env and config/services.php.');
         }
 
-        // Convert amount to smallest currency unit (cents for USD, piastres for EGP, etc.)
-        $amountInSmallestUnit = $this->convertToSmallestCurrencyUnit($amount, $currency);
+        // Try different amount formats - some payment gateways are very specific
+        $amountFormats = $this->getAmountFormats($amount, $currency);
         
-        $timestamp = now()->toISOString(); // Use ISO 8601 format
-        $signature = $this->generateSignature($merchantPublicKey, $amountInSmallestUnit, $currency, $merchantReferenceId, $apiPassword, $timestamp);
-
-        $data = array_merge([
-            'amount' => $amountInSmallestUnit,
-            'currency' => $currency,
-            'merchantReferenceId' => $merchantReferenceId,
-            'timestamp' => $timestamp,
-            'signature' => $signature,
-            'callbackUrl' => $callbackUrl,
-        ], $otherParams);
-
-        Log::info('Geidea API request data:', [
-            'amount' => $amount,
-            'amountInSmallestUnit' => $amountInSmallestUnit,
-            'currency' => $currency,
-            'merchantReferenceId' => $merchantReferenceId,
-            'timestamp' => $timestamp,
-            'url' => 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session'
-        ]);
-
-        $url = 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session';
-
-        try {
-            $response = Http::withBasicAuth($merchantPublicKey, $apiPassword)
-                ->timeout(30) // Add timeout
-                ->post($url, $data);
-
-            Log::info('Geidea API response received:', [
-                'statusCode' => $response->status(),
-                'responseCode' => $response->json('responseCode'),
-                'responseMessage' => $response->json('detailedResponseMessage')
-            ]);
-
-            if ($response->successful() && $response->json('responseCode') === '000') {
-                return $response->json('session.id');
-            } else {
-                $errorMessage = $response->json('detailedResponseMessage') ?? 'Geidea session creation failed';
-                $responseCode = $response->json('responseCode');
-                
-                Log::error('Geidea API error response:', [
-                    'responseCode' => $responseCode,
-                    'errorMessage' => $errorMessage,
-                    'fullResponse' => $response->json(),
-                    'statusCode' => $response->status()
+        foreach ($amountFormats as $formatName => $formattedAmount) {
+            try {
+                Log::info("Trying amount format: {$formatName}", [
+                    'amount' => $formattedAmount,
+                    'formatName' => $formatName
                 ]);
                 
-                throw new \Exception("Geidea API Error (Code: {$responseCode}): {$errorMessage}");
-            }
-        } catch (\Exception $e) {
-            if ($e instanceof \Illuminate\Http\Client\ConnectionException) {
-                Log::error('Geidea API connection error:', [
-                    'error' => $e->getMessage(),
-                    'url' => $url
+                $result = $this->attemptCreateSession(
+                    $formattedAmount,
+                    $currency,
+                    $merchantReferenceId,
+                    $callbackUrl,
+                    $apiPassword,
+                    $merchantPublicKey,
+                    $otherParams
+                );
+                
+                Log::info("Successfully created session with format: {$formatName}", [
+                    'amount' => $formattedAmount,
+                    'formatName' => $formatName
                 ]);
-                throw new \Exception('Unable to connect to Geidea payment service. Please try again later.');
+                
+                return $result;
+                
+            } catch (\Exception $e) {
+                Log::warning("Failed to create session with format: {$formatName}", [
+                    'amount' => $formattedAmount,
+                    'formatName' => $formatName,
+                    'error' => $e->getMessage()
+                ]);
+                
+                // If this is the last format to try, throw the exception
+                if ($formatName === array_key_last($amountFormats)) {
+                    throw $e;
+                }
+                
+                // Continue to next format
+                continue;
             }
-            
-            // Re-throw the original exception if it's not a connection issue
-            throw $e;
         }
+        
+        throw new \Exception('All amount formats failed for Geidea API');
+    }
+    
+    /**
+     * Get different amount formats to try with the payment gateway
+     */
+    private function getAmountFormats($amount, $currency)
+    {
+        $formats = [];
+        
+        switch (strtoupper($currency)) {
+            case 'EGP':
+                // For EGP, try multiple formats
+                $formats = [
+                    'piastres' => (int) round($amount * 100),
+                    'decimal_2' => round($amount, 2),
+                    'decimal_0' => (int) round($amount),
+                    'string_piastres' => (string) round($amount * 100),
+                    'string_decimal' => (string) round($amount, 2)
+                ];
+                break;
+                
+            case 'USD':
+                // For USD, try multiple formats
+                $formats = [
+                    'cents' => (int) round($amount * 100),
+                    'decimal_2' => round($amount, 2),
+                    'decimal_0' => (int) round($amount),
+                    'string_cents' => (string) round($amount * 100),
+                    'string_decimal' => (string) round($amount, 2)
+                ];
+                break;
+                
+            default:
+                // For other currencies
+                $formats = [
+                    'smallest_unit' => (int) round($amount * 100),
+                    'decimal_2' => round($amount, 2),
+                    'decimal_0' => (int) round($amount),
+                    'string_smallest' => (string) round($amount * 100),
+                    'string_decimal' => (string) round($amount, 2)
+                ];
+                break;
+        }
+        
+        return $formats;
+    }
+    
+    /**
+     * Attempt to create a session with a specific amount format
+     */
+    private function attemptCreateSession($amount, $currency, $merchantReferenceId, $callbackUrl, $apiPassword, $merchantPublicKey, $otherParams = [])
+    {
+        // Try different timestamp formats - some payment gateways are very specific
+        $timestampFormats = [
+            'iso8601' => now()->toISOString(),
+            'unix_timestamp' => (string) now()->timestamp,
+            'mysql_format' => now()->format('Y-m-d H:i:s'),
+            'custom_format' => now()->format('Y/m/d H:i:s')
+        ];
+        
+        foreach ($timestampFormats as $formatName => $timestamp) {
+            try {
+                Log::info("Trying timestamp format: {$formatName}", [
+                    'timestamp' => $timestamp,
+                    'formatName' => $formatName
+                ]);
+                
+                $signature = $this->generateSignature($merchantPublicKey, $amount, $currency, $merchantReferenceId, $apiPassword, $timestamp);
+
+                $data = array_merge([
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'merchantReferenceId' => $merchantReferenceId,
+                    'timestamp' => $timestamp,
+                    'signature' => $signature,
+                    'callbackUrl' => $callbackUrl,
+                ], $otherParams);
+
+                Log::info('Geidea API request data:', [
+                    'amount' => $amount,
+                    'amountType' => gettype($amount),
+                    'currency' => $currency,
+                    'merchantReferenceId' => $merchantReferenceId,
+                    'timestamp' => $timestamp,
+                    'timestampFormat' => $formatName,
+                    'url' => 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session'
+                ]);
+
+                $url = 'https://api.merchant.geidea.net/payment-intent/api/v2/direct/session';
+
+                // Log the complete request payload for debugging
+                Log::info('Complete Geidea API request payload:', [
+                    'url' => $url,
+                    'payload' => $data,
+                    'headers' => [
+                        'Authorization' => 'Basic ' . base64_encode($merchantPublicKey . ':' . $apiPassword),
+                        'Content-Type' => 'application/json'
+                    ]
+                ]);
+
+                try {
+                    $response = Http::withBasicAuth($merchantPublicKey, $apiPassword)
+                        ->withHeaders([
+                            'Content-Type' => 'application/json',
+                            'Accept' => 'application/json',
+                            'User-Agent' => 'ATech-Payment-Service/1.0'
+                        ])
+                        ->timeout(30) // Add timeout
+                        ->post($url, $data);
+
+                    Log::info('Geidea API response received:', [
+                        'statusCode' => $response->status(),
+                        'responseCode' => $response->json('responseCode'),
+                        'responseMessage' => $response->json('detailedResponseMessage'),
+                        'timestampFormat' => $formatName
+                    ]);
+
+                    if ($response->successful() && $response->json('responseCode') === '000') {
+                        Log::info("Successfully created session with timestamp format: {$formatName}");
+                        return $response->json('session.id');
+                    } else {
+                        $errorMessage = $response->json('detailedResponseMessage') ?? 'Geidea session creation failed';
+                        $responseCode = $response->json('responseCode');
+                        
+                        Log::warning("Failed with timestamp format: {$formatName}", [
+                            'responseCode' => $responseCode,
+                            'errorMessage' => $errorMessage,
+                            'fullResponse' => $response->json(),
+                            'statusCode' => $response->status()
+                        ]);
+                        
+                        // If this is the last timestamp format to try, throw the exception
+                        if ($formatName === array_key_last($timestampFormats)) {
+                            throw new \Exception("Geidea API Error (Code: {$responseCode}): {$errorMessage}");
+                        }
+                        
+                        // Continue to next timestamp format
+                        continue;
+                    }
+                } catch (\Exception $e) {
+                    if ($e instanceof \Illuminate\Http\Client\ConnectionException) {
+                        Log::error('Geidea API connection error:', [
+                            'error' => $e->getMessage(),
+                            'url' => $url
+                        ]);
+                        throw new \Exception('Unable to connect to Geidea payment service. Please try again later.');
+                    }
+                    
+                    // If this is the last timestamp format to try, throw the exception
+                    if ($formatName === array_key_last($timestampFormats)) {
+                        throw $e;
+                    }
+                    
+                    // Continue to next timestamp format
+                    continue;
+                }
+                
+            } catch (\Exception $e) {
+                // If this is the last timestamp format to try, throw the exception
+                if ($formatName === array_key_last($timestampFormats)) {
+                    throw $e;
+                }
+                
+                // Continue to next timestamp format
+                continue;
+            }
+        }
+        
+        throw new \Exception('All timestamp formats failed for Geidea API');
     }
 
     /**
@@ -163,24 +315,71 @@ class GeideaPaymentService
             throw new \InvalidArgumentException('Amount is too large');
         }
         
-        // Most currencies use 100 as the smallest unit
-        $multiplier = 100;
-        
-        // Convert to integer to avoid floating point precision issues
-        $amountInSmallestUnit = (int) round($amount * $multiplier);
-        
-        // Ensure the converted amount is positive
-        if ($amountInSmallestUnit <= 0) {
-            throw new \InvalidArgumentException('Converted amount must be greater than 0');
+        // Handle different currencies - some payment gateways have specific requirements
+        switch (strtoupper($currency)) {
+            case 'EGP':
+                // For EGP, try both formats: piastres and decimal
+                $amountInPiastres = (int) round($amount * 100);
+                $amountInDecimal = round($amount, 2);
+                
+                Log::info('EGP amount conversion options:', [
+                    'originalAmount' => $amount,
+                    'amountInPiastres' => $amountInPiastres,
+                    'amountInDecimal' => $amountInDecimal
+                ]);
+                
+                // Try piastres first (most common for EGP)
+                return $amountInPiastres;
+                
+            case 'USD':
+                // For USD, convert to cents
+                $amountInCents = (int) round($amount * 100);
+                Log::info('USD amount conversion:', [
+                    'originalAmount' => $amount,
+                    'amountInCents' => $amountInCents
+                ]);
+                return $amountInCents;
+                
+            default:
+                // For other currencies, try both approaches
+                $amountInSmallestUnit = (int) round($amount * 100);
+                $amountInDecimal = round($amount, 2);
+                
+                Log::info('Default currency amount conversion:', [
+                    'currency' => $currency,
+                    'originalAmount' => $amount,
+                    'amountInSmallestUnit' => $amountInSmallestUnit,
+                    'amountInDecimal' => $amountInDecimal
+                ]);
+                
+                return $amountInSmallestUnit;
         }
-        
-        Log::info('Amount conversion:', [
-            'originalAmount' => $amount,
-            'currency' => $currency,
-            'multiplier' => $multiplier,
-            'convertedAmount' => $amountInSmallestUnit
-        ]);
-        
-        return $amountInSmallestUnit;
+    }
+
+    /**
+     * Clean and validate merchant reference ID.
+     * Geidea has a limit on merchantReferenceId length (e.g., 50 characters).
+     * If the ID is too long, it will be truncated.
+     */
+    private function cleanMerchantReferenceId($merchantReferenceId)
+    {
+        $maxLength = 50; // Geidea's maximum allowed length for merchantReferenceId
+        if (strlen($merchantReferenceId) > $maxLength) {
+            Log::warning("Merchant reference ID is too long. Truncating to {$maxLength} characters.", [
+                'originalLength' => strlen($merchantReferenceId),
+                'merchantReferenceId' => $merchantReferenceId
+            ]);
+            return substr($merchantReferenceId, 0, $maxLength);
+        }
+        return $merchantReferenceId;
+    }
+
+    /**
+     * Normalize currency code to a standard format if needed.
+     * Geidea expects uppercase 3-letter codes.
+     */
+    private function normalizeCurrency($currency)
+    {
+        return strtoupper($currency);
     }
 } 
