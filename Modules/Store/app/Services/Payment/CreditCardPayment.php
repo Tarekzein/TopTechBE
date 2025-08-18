@@ -151,11 +151,65 @@ class CreditCardPayment extends AbstractPaymentMethod
     public function handleCallback(array $data): array
     {
         Log::info('Geidea callback received', $data);
-        // You can add more logic here to update order/payment status
-        return [
-            'status' => 'success',
-            'message' => 'Callback handled'
-        ];
+        // Validate callback and extract order/session info
+        $geideaService = $this->geideaService;
+        $orderRepository = app(\Modules\Store\Repositories\OrderRepository::class);
+        $result = null;
+        try {
+            // Validate callback and get result
+            $apiPassword = config('services.geidea.api_password');
+            $publicKey = config('services.geidea.public_key');
+            $validation = $geideaService->validateCallback($data, $apiPassword, $publicKey);
+            $order = null;
+            // Try to find order by orderId or reference or sessionId
+            if (!empty($validation['orderId'])) {
+                $order = $orderRepository->findByOrderNumber($validation['orderId']);
+            }
+            if (!$order && !empty($validation['reference'])) {
+                $order = $orderRepository->findByOrderNumber($validation['reference']);
+            }
+            if (!$order && !empty($data['sessionId'])) {
+                $order = $orderRepository->findByPaymentSessionId($data['sessionId']);
+            }
+            if (!$order) {
+                Log::error('Order not found for Geidea callback', ['orderId' => $validation['orderId'] ?? null, 'reference' => $validation['reference'] ?? null, 'sessionId' => $data['sessionId'] ?? null]);
+                return [
+                    'status' => 'error',
+                    'message' => 'Order not found for callback',
+                ];
+            }
+            // Update order payment_status and status
+            if ($validation['isSuccessful']) {
+                $orderRepository->update($order, [
+                    'payment_status' => 'paid',
+                    'status' => 'processing',
+                    'paid_at' => now(),
+                ]);
+                $result = [
+                    'status' => 'success',
+                    'message' => 'Payment successful, order updated',
+                ];
+            } else {
+                $orderRepository->update($order, [
+                    'payment_status' => 'failed',
+                    'status' => 'cancelled',
+                ]);
+                $result = [
+                    'status' => 'error',
+                    'message' => 'Payment failed, order updated',
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error('Error handling Geidea callback', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            $result = [
+                'status' => 'error',
+                'message' => 'Exception: ' . $e->getMessage(),
+            ];
+        }
+        return $result;
     }
 
     protected function validatePaymentData(Order $order, array $paymentData): void
