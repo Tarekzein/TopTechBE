@@ -196,18 +196,43 @@ class PaymentController extends Controller
     public function geideaCallback(Request $request)
     {
         Log::info('Geidea payment callback received', $request->all());
-        $merchantReferenceId = $request->input('merchantReferenceId');
-        $status = $request->input('status') ?? $request->input('paymentStatus') ?? $request->input('responseCode');
-        $order = $this->orderRepository->findByOrderNumber($merchantReferenceId);
+        // Prefer nested 'order.merchantReferenceId' if present (per Geidea payload), fallback to top-level
+        $merchantReferenceId = data_get($request->all(), 'order.merchantReferenceId', $request->input('merchantReferenceId'));
+        $sessionId = data_get($request->all(), 'order.sessionId', $request->input('sessionId'));
+
+        // Determine status using several possible fields
+        $status = data_get($request->all(), 'order.status',
+            $request->input('status') ?? $request->input('paymentStatus') ?? $request->input('responseCode'));
+
+        // Find order using merchantReferenceId (maps to our order_number)
+        $order = null;
+        if (!empty($merchantReferenceId)) {
+            $order = $this->orderRepository->findByOrderNumber($merchantReferenceId);
+        }
+        // Fallback to sessionId if order not found by merchantReferenceId
+        if (!$order && !empty($sessionId)) {
+            $order = $this->orderRepository->findByPaymentSessionId($sessionId);
+        }
         if (!$order) {
-            Log::error('Order not found for Geidea callback', ['merchantReferenceId' => $merchantReferenceId]);
+            Log::error('Order not found for Geidea callback', [
+                'merchantReferenceId' => $merchantReferenceId,
+                'sessionId' => $sessionId,
+            ]);
             return response()->json(['status' => 'error', 'message' => 'Order not found'], 404);
         }
         // Determine payment status
         $paidStatuses = ['success', 'paid', '000']; // 000 is Geidea success code
-        $isPaid = in_array(strtolower($status), $paidStatuses) || $status === '000';
+        $statusLower = is_string($status) ? strtolower($status) : $status;
+        $isPaid = in_array($statusLower, $paidStatuses, true) || $status === '000';
         $newStatus = $isPaid ? 'paid' : 'failed';
-        $this->orderService->updatePaymentStatus($order, $newStatus, $request->input('paymentId') ?? null);
+        // Capture payment identifiers
+        $paymentId = data_get($request->all(), 'order.transactions.1.transactionId', $request->input('paymentId'));
+        // Update payment status and store sessionId and raw callback reference
+        $this->orderRepository->mergeMeta($order, array_filter([
+            'geidea_session_id' => $sessionId,
+            'geidea_reference' => data_get($request->all(), 'order.transactions.1.transactionId')
+        ]));
+        $this->orderService->updatePaymentStatus($order, $newStatus, $paymentId);
         Log::info('Order payment status updated from Geidea callback', [
             'order_number' => $order->order_number,
             'new_status' => $newStatus,

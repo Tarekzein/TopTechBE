@@ -5,6 +5,7 @@ namespace Modules\Store\Repositories;
 use Modules\Store\Models\Order;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Log;
 
 class OrderRepository
 {
@@ -53,7 +54,7 @@ class OrderRepository
         try {
             return Order::create($data);
         } catch (\Exception $e) {
-            \Log::error('Failed to create order: ' . $e->getMessage(), [
+            Log::error('Failed to create order: ' . $e->getMessage(), [
                 'data' => $data,
                 'exception' => $e
             ]);
@@ -70,6 +71,39 @@ class OrderRepository
     public function findByOrderNumber(string $orderNumber): ?Order
     {
         return Order::where('order_number', $orderNumber)->first();
+    }
+
+    /**
+     * Find an order by stored Geidea session ID in meta_data.
+     *
+     * @param string $sessionId
+     * @return Order|null
+     */
+    public function findByPaymentSessionId(string $sessionId): ?Order
+    {
+        return Order::where('meta_data->geidea_session_id', $sessionId)->first();
+    }
+
+    /**
+     * Merge and update meta_data for an order.
+     *
+     * @param Order $order
+     * @param array $meta
+     * @return Order
+     */
+    public function mergeMeta(Order $order, array $meta): Order
+    {
+        $currentMeta = $order->meta_data;
+        if (!is_array($currentMeta)) {
+            $decoded = json_decode((string) $currentMeta, true);
+            $currentMeta = is_array($decoded) ? $decoded : [];
+        }
+
+        $newMeta = array_merge($currentMeta, $meta);
+
+        return $this->update($order, [
+            'meta_data' => $newMeta,
+        ]);
     }
 
     /**
@@ -196,7 +230,7 @@ class OrderRepository
             $order->update($data);
             return $order->fresh();
         } catch (\Exception $e) {
-            \Log::error('Failed to update order: ' . $e->getMessage(), [
+            Log::error('Failed to update order: ' . $e->getMessage(), [
                 'order_id' => $order->id,
                 'data' => $data,
                 'exception' => $e

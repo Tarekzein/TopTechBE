@@ -118,6 +118,19 @@ class CreditCardPayment extends AbstractPaymentMethod
                 config('services.geidea.public_key'),
                 $paymentData // pass any extra params (customer, order, etc)
             );
+            // If we have an Order model, store the sessionId in meta for callback lookup fallback
+            if ($order instanceof Order && !empty($sessionId)) {
+                try {
+                    app(\Modules\Store\Repositories\OrderRepository::class)->mergeMeta($order, [
+                        'geidea_session_id' => $sessionId,
+                    ]);
+                } catch (\Throwable $t) {
+                    Log::warning('Failed to store geidea_session_id on order meta', [
+                        'order_number' => $order->order_number ?? null,
+                        'error' => $t->getMessage(),
+                    ]);
+                }
+            }
             return [
                 'status' => 'success',
                 'sessionId' => $sessionId,
