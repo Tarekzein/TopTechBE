@@ -198,7 +198,7 @@ class OrderController extends Controller
     public function updateStatus(Request $request, string $orderNumber): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|string|in:pending,processing,completed,cancelled,refunded',
+            'status' => 'required|string|in:pending,processing,shipped,delivered,cancelled,refunded',
         ]);
 
         if ($validator->fails()) {
@@ -316,7 +316,7 @@ class OrderController extends Controller
     {
         try {
             $filters = $request->validate([
-                'status' => 'nullable|string|in:pending,processing,completed,cancelled,refunded',
+                'status' => 'nullable|string|in:pending,processing,shipped,delivered,cancelled,refunded',
                 'payment_status' => 'nullable|string|in:pending,paid,failed,refunded',
                 'date_from' => 'nullable|date',
                 'date_to' => 'nullable|date|after_or_equal:date_from',
@@ -393,7 +393,7 @@ class OrderController extends Controller
     {
         try {
             $data = $request->validate([
-                'status' => 'required|string|in:pending,processing,completed,cancelled',
+                'status' => 'required|string|in:pending,processing,shipped,delivered,cancelled,refunded',
             ]);
 
             $order = $this->orderService->getVendorOrder($orderNumber);

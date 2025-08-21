@@ -318,7 +318,7 @@ class OrderService
         $data = ['status' => $status];
 
         switch ($status) {
-            case 'completed':
+            case 'delivered':
                 $data['completed_at'] = now();
                 break;
             case 'cancelled':
@@ -525,7 +525,7 @@ class OrderService
             throw new \Exception('This order does not contain any products from your vendor account.');
         }
 
-        if (!in_array($status, ['pending', 'processing', 'completed', 'cancelled'])) {
+        if (!in_array($status, ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'])) {
             throw new \Exception('Invalid status for vendor order update.');
         }
 
