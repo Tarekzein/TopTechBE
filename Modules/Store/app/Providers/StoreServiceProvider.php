@@ -75,6 +75,7 @@ class StoreServiceProvider extends ServiceProvider
         $this->registerCommands();
         $this->bindRepositories();
         $this->bindServices();
+        
     }
 
     /**
