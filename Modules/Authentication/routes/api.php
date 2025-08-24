@@ -20,4 +20,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthenticationController::class, 'login']);
     Route::post('/dashboard-login', [AuthenticationController::class, 'dashboardLogin']);
     Route::post('/logout', [AuthenticationController::class, 'logout'])->middleware('auth:sanctum');
+    // Password reset routes
+    Route::post('forgot-password', [AuthenticationController::class, 'forgotPassword']);
+    Route::post('verify-otp', [AuthenticationController::class, 'verifyOtp']);
+    Route::post('reset-password', [AuthenticationController::class, 'resetPassword']);
+
 });
