@@ -13,6 +13,7 @@ use Modules\Store\Http\Controllers\AddressController;
 use Modules\Store\Http\Controllers\PaymentController;
 use Modules\Store\Http\Controllers\SettingController;
 use Modules\Store\Http\Controllers\CurrencyController;
+use Modules\Store\Http\Controllers\AnalyticsController;
 /*
 |--------------------------------------------------------------------------
 | Store Module API Routes
@@ -183,6 +184,23 @@ Route::prefix('store')->group(function () {
 
     // PromoCode validation route
     Route::get('promocodes/validate', [\Modules\Store\Http\Controllers\PromoCodeController::class, 'validateCode']);
+
+    // Analytics Routes
+    Route::middleware(['auth:sanctum', 'role:vendor'])->prefix('analytics')->group(function () {
+        Route::get('/dashboard', [AnalyticsController::class, 'getVendorDashboard']);
+        Route::get('/revenue', [AnalyticsController::class, 'getRevenueAnalytics']);
+        Route::get('/orders', [AnalyticsController::class, 'getOrdersAnalytics']);
+        Route::get('/products', [AnalyticsController::class, 'getProductsAnalytics']);
+        Route::get('/customers', [AnalyticsController::class, 'getCustomersAnalytics']);
+        Route::get('/summary', [AnalyticsController::class, 'getSummary']);
+        Route::post('/export', [AnalyticsController::class, 'exportReport']);
+    });
+
+    // Admin Analytics Routes
+    Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->prefix('admin/analytics')->group(function () {
+        Route::get('/vendors', [AnalyticsController::class, 'getAllVendorsAnalytics']);
+        Route::get('/vendors/{vendorId}', [AnalyticsController::class, 'getVendorAnalytics']);
+    });
 });
 
 Route::get('/debug-auth', function (Request $request) {
