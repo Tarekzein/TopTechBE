@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Validator;
 use Modules\Store\Models\BillingAddress;
 use Modules\Store\Models\ShippingAddress;
 use Illuminate\Support\Facades\Log;
+use Modules\Store\Events\OrderCreated;
+use Modules\Store\Events\OrderStatusUpdated;
 
 class OrderController extends Controller
 {
@@ -149,6 +151,7 @@ class OrderController extends Controller
                 array_merge($request->all(), ['order_number' => $orderNumber]),
                 $cart
             );
+            event(new OrderCreated($order));
             return response()->json([
                 'order' => $order,
                 'payment' => $paymentResult,
@@ -212,7 +215,14 @@ class OrderController extends Controller
         }
 
         try {
+             $oldStatus = $order->status;
             $order = $this->orderService->updateStatus($order, $request->status);
+            
+            // Dispatch status updated event
+            if ($oldStatus !== $order->status) {
+                event(new OrderStatusUpdated($order, $oldStatus, $order->status));
+            }
+
             return response()->json($order);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to update order status: ' . $e->getMessage()], 500);

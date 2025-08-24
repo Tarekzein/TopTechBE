@@ -5,7 +5,10 @@ namespace Modules\Store\Providers;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Modules\Store\Repositories\CartRepository;
 use Modules\Store\Services\CartService;
-
+use Modules\Store\Events\OrderCreated;
+use Modules\Store\Events\OrderStatusUpdated;
+use Modules\Store\Listeners\SendOrderConfirmationEmail;
+use Modules\Store\Listeners\SendOrderStatusUpdateEmail;
 class EventServiceProvider extends ServiceProvider
 {
     /**
@@ -13,7 +16,13 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        OrderCreated::class => [
+            SendOrderConfirmationEmail::class,
+        ],
+        OrderStatusUpdated::class => [
+            SendOrderStatusUpdateEmail::class,
+        ]];
 
     /**
      * Indicates if events should be discovered.
@@ -32,6 +41,7 @@ class EventServiceProvider extends ServiceProvider
 
     public function register()
     {
+        
         $this->app->singleton(CartRepository::class, function ($app) {
             return new CartRepository();
         });
