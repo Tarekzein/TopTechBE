@@ -150,17 +150,14 @@ class AuthenticationController extends Controller
 {
     try {
         $data = $request->validate([
-            'email' => 'required|email|exists:users,email', // points to main users table
-            'channel' => 'nullable|string|in:mail,database,vonage,broadcast'
+            'email' => 'required|email|exists:users,email',
+            // Remove channel parameter since it's no longer needed
         ]);
 
-        $result = $this->auth_service->forgotPassword(
-            $data['email'], 
-            $data['channel'] ?? 'mail'
-        );
+        $result = $this->auth_service->forgotPassword($data['email']);
         
         return response()->json([
-            'message' => 'OTP has been sent',
+            'message' => 'OTP has been sent to your email and saved in notifications',
             'data' => $result
         ], 200);
         

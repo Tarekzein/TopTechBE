@@ -52,61 +52,49 @@ class AuthenticationService implements AuthenticationServiceInterface
     {
         return $this->auth_repository->dashboardLogin($credentials);
     }
-    public function forgotPassword(string $email, string $channel = 'mail')
-    {
-        // Delete any existing OTPs for this email
-        DB::table('otps')->where('email', $email)->delete();
+    public function forgotPassword(string $email)
+{
+    // Delete any existing OTPs for this email
+    DB::table('otps')->where('email', $email)->delete();
 
-        // Generate OTP (6 digits)
-        $otpCode = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
-        
-        // Create OTP record
-        $token = Str::random(60);
-        $expiresAt = Carbon::now()->addMinutes(15);
-        
-        DB::table('otps')->insert([
-            'email' => $email,
-            'otp' => $otpCode,
-            'token' => $token,
-            'expires_at' => $expiresAt,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+    // Generate OTP (6 digits)
+    $otpCode = str_pad(rand(0, 999999), 6, '0', STR_PAD_LEFT);
+    
+    // Create OTP record
+    $token = Str::random(60);
+    $expiresAt = Carbon::now()->addMinutes(15);
+    
+    DB::table('otps')->insert([
+        'email' => $email,
+        'otp' => $otpCode,
+        'token' => $token,
+        'expires_at' => $expiresAt,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
-        // Find user and send notification
-        $user = User::where('email', $email)->first();
-        
-        if ($user) {
-            try {
-                // Send OTP notification (default: mail)
-                $user->notify(new SendOtpNotification($otpCode, 'mail'));
-                
-                // Or send via multiple channels:
-                // $user->notify(new SendOtpNotification($otpCode, 'database'));
-                // $user->notify(new SendOtpNotification($otpCode, 'vonage'));
-                
-                Log::info('OTP notification sent to: ' . $email);
-            } catch (Exception $e) {
-                Log::error('Notification failed: ' . $e->getMessage());
-                // Continue anyway - OTP is stored
-            }
-        }
- if ($user) {
+    // Find user and send notification
+    $user = User::where('email', $email)->first();
+    
+    if ($user) {
         try {
-            $user->notify(new SendOtpNotification($otpCode, $channel));
-            Log::info("OTP sent via {$channel} to: " . $email);
+            // Send OTP notification to mail and database
+            $user->notify(new SendOtpNotification($otpCode));
+            
+            Log::info("OTP sent to: " . $email);
         } catch (Exception $e) {
-            Log::error("{$channel} notification failed: " . $e->getMessage());
+            Log::error("Notification failed: " . $e->getMessage());
+            // Continue anyway - OTP is stored
         }
     }
 
-        return [
-            'email' => $email,
-            'expires_at' => $expiresAt,
-            'token' => $token,
-            'message' => 'OTP sent successfully'
-        ];
-    }
+    return [
+        'email' => $email,
+        'expires_at' => $expiresAt,
+        'token' => $token,
+        'message' => 'OTP sent successfully'
+    ];
+}
 
     /**
      * Verify OTP

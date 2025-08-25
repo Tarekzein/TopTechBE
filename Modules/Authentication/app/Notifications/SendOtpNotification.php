@@ -6,25 +6,21 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Messages\VonageMessage;
-use Illuminate\Notifications\Messages\BroadcastMessage;
 
 class SendOtpNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public $otp;
-    public $channel;
 
-    public function __construct(string $otp, string $channel = 'mail')
+    public function __construct(string $otp)
     {
         $this->otp = $otp;
-        $this->channel = $channel;
     }
 
     public function via($notifiable)
     {
-        return [$this->channel];
+        return ['mail', 'database'];
     }
 
     public function toMail($notifiable)
@@ -45,21 +41,6 @@ class SendOtpNotification extends Notification implements ShouldQueue
             'action_url' => null,
             'type' => 'otp_notification'
         ];
-    }
-
-    public function toBroadcast($notifiable)
-    {
-        return new BroadcastMessage([
-            'otp' => $this->otp,
-            'message' => 'Your OTP code has been sent.',
-            'created_at' => now()
-        ]);
-    }
-
-    public function toVonage($notifiable)
-    {
-        return (new VonageMessage)
-            ->content('Your OTP code is: ' . $this->otp . '. Expires in 15 minutes.');
     }
 
     public function toArray($notifiable)
