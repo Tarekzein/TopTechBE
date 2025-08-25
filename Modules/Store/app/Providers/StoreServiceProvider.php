@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Store\App\Console\Commands\UpdateExchangeRates;
 use Modules\Store\App\Repositories\CurrencyRepository;
 use Modules\Store\App\Repositories\SettingRepository;
+use Modules\Store\Repositories\OrderRepository;
 use Modules\Store\App\Services\CurrencyService;
 use Modules\Store\App\Services\SettingService;
 use Modules\Store\Interfaces\CurrencyRepositoryInterface;
@@ -72,6 +73,7 @@ class StoreServiceProvider extends ServiceProvider
     {
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
+        $this->app->register(AnalyticsServiceProvider::class);
         $this->registerCommands();
         $this->bindRepositories();
         $this->bindServices();
