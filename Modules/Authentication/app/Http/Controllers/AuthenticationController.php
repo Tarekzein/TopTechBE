@@ -146,33 +146,36 @@ class AuthenticationController extends Controller
         }
     }
 // frogot pass logic
-    public function forgotPassword(Request $request)
-    {
-        try {
-            $data = $request->validate([
-                'email' => 'required|email|exists:users,email',
-            ]);
+ public function forgotPassword(Request $request)
+{
+    try {
+        $data = $request->validate([
+            'email' => 'required|email|exists:users,email', // points to main users table
+            'channel' => 'nullable|string|in:mail,database,vonage,broadcast'
+        ]);
 
-            $result = $this->auth_service->forgotPassword($data['email']);
-            
-            return response()->json([
-                'message' => 'OTP sent successfully',
-                'data' => $result
-            ], 200);
-            
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (Exception $e) {
-            return response()->json([
-                'message' => 'Failed to send OTP',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        $result = $this->auth_service->forgotPassword(
+            $data['email'], 
+            $data['channel'] ?? 'mail'
+        );
+        
+        return response()->json([
+            'message' => 'OTP has been sent',
+            'data' => $result
+        ], 200);
+        
+    } catch (ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (Exception $e) {
+        return response()->json([
+            'message' => 'Failed to process request',
+            'error' => $e->getMessage()
+        ], 500);
     }
-
+}
     /**
      * Verify OTP for password reset
      */
