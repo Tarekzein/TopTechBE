@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Modules\Blog\App\Services\Interfaces\CategoryServiceInterface;
 use Modules\Blog\App\Http\Requests\BlogCategoryRequest;
-
+use Illuminate\Validation\Rule;
 class BlogCategoryController extends Controller
 {
     protected CategoryServiceInterface $categoryService;
@@ -115,7 +115,10 @@ class BlogCategoryController extends Controller
     public function move(Request $request, int $id): JsonResponse
     {
         $data = $request->validate([
-            'parent_id' => 'nullable|exists:blog_categories,id'
+            'parent_id' => [
+                'nullable',
+                Rule::exists('blog_categories', 'id')->whereNull('deleted_at'),
+            ],
         ]);
 
         $moved = $this->categoryService->moveCategory($id, $data['parent_id'] ?? null);
