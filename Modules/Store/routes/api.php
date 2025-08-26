@@ -208,22 +208,23 @@ Route::prefix('store')->group(function () {
         // Admin customer routes
         Route::middleware(['role:admin|super-admin'])->prefix('admin/customers')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
-            Route::get('/{customerId}', [CustomerController::class, 'show']);
             Route::get('/analytics/summary', [CustomerController::class, 'analytics']);
-            Route::get('/export', [CustomerController::class, 'export']);
+            Route::get('/data/export', [CustomerController::class, 'export']);
             
             // Admin routes for specific vendor's customers
             Route::get('/vendors/{vendorId}', [CustomerController::class, 'adminVendorIndex']);
-            Route::get('/vendors/{vendorId}/customers/{customerId}', [CustomerController::class, 'adminVendorShow']);
             Route::get('/vendors/{vendorId}/analytics', [CustomerController::class, 'adminVendorAnalytics']);
+            Route::get('/vendors/{vendorId}/customers/{customerId}', [CustomerController::class, 'adminVendorShow']);
+            
+            Route::get('/{customerId}', [CustomerController::class, 'show']);
         });
 
         // Vendor customer routes
         Route::middleware(['role:vendor'])->prefix('vendor/customers')->group(function () {
             Route::get('/', [CustomerController::class, 'vendorIndex']);
-            Route::get('/{customerId}', [CustomerController::class, 'vendorShow']);
             Route::get('/analytics/summary', [CustomerController::class, 'vendorAnalytics']);
-            Route::get('/export', [CustomerController::class, 'vendorExport']);
+            Route::get('/data/export', [CustomerController::class, 'vendorExport']);
+            Route::get('/{customerId}', [CustomerController::class, 'vendorShow']);
         });
 
         // General customer summary (accessible by both admin and vendor)
