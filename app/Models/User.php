@@ -10,6 +10,7 @@ use Cviebrock\EloquentSluggable\Sluggable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Modules\Vendor\Models\Vendor;
+use Modules\Store\Models\Order;
 
 class User extends Authenticatable
 {
@@ -65,5 +66,10 @@ class User extends Authenticatable
     public function vendor()
     {
         return $this->hasOne(Vendor::class);
+    }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
     }
 }
