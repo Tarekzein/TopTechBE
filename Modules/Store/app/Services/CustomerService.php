@@ -4,6 +4,7 @@ namespace Modules\Store\Services;
 
 use Modules\Store\Repositories\CustomerRepository;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use App\Models\User;
 
@@ -159,27 +160,37 @@ class CustomerService
      */
     public function exportCustomersData(array $filters = []): array
     {
-        // Remove pagination for export
-        $filters['per_page'] = 10000; // Large number to get all records
-        $customers = $this->customerRepository->getAllCustomers($filters);
+        try {
+            // Remove pagination for export
+            $filters['per_page'] = 10000; // Large number to get all records
+            $paginatedCustomers = $this->customerRepository->getAllCustomers($filters);
+            $customers = $paginatedCustomers->items(); // Get the actual items from pagination
 
-        $exportData = [];
-        foreach ($customers as $customer) {
-            $exportData[] = [
-                'id' => $customer->id,
-                'name' => $customer->first_name . ' ' . $customer->last_name,
-                'email' => $customer->email,
-                'total_orders' => $customer->orders_count,
-                'completed_orders' => $customer->completed_orders_count,
-                'total_spent' => $customer->orders_sum_total ?? 0,
-                'avg_order_value' => $customer->orders_avg_total ?? 0,
-                'first_order' => $customer->orders->first()?->created_at?->format('Y-m-d'),
-                'last_order' => $customer->orders->last()?->created_at?->format('Y-m-d'),
-                'registered_at' => $customer->created_at->format('Y-m-d'),
-            ];
+            $exportData = [];
+            foreach ($customers as $customer) {
+                $exportData[] = [
+                    'id' => $customer->id,
+                    'name' => ($customer->first_name ?? '') . ' ' . ($customer->last_name ?? ''),
+                    'email' => $customer->email ?? '',
+                    'total_orders' => $customer->orders_count ?? 0,
+                    'completed_orders' => $customer->completed_orders_count ?? 0,
+                    'total_spent' => $customer->orders_sum_total ?? 0,
+                    'avg_order_value' => $customer->orders_avg_total ?? 0,
+                    'first_order' => $customer->orders->first()?->created_at?->format('Y-m-d') ?? null,
+                    'last_order' => $customer->orders->last()?->created_at?->format('Y-m-d') ?? null,
+                    'registered_at' => $customer->created_at?->format('Y-m-d') ?? null,
+                ];
+            }
+
+            return $exportData;
+        } catch (\Exception $e) {
+            Log::error('Export customers failed: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'filters' => $filters,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        return $exportData;
     }
 
     /**
@@ -191,36 +202,46 @@ class CustomerService
      */
     public function exportVendorCustomersData(array $filters = []): array
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
 
-        if (!$user) {
-            throw new \Exception('User not authenticated.');
+            if (!$user) {
+                throw new \Exception('User not authenticated.');
+            }
+
+            if (!$user->vendor) {
+                throw new \Exception('User is not associated with any vendor account.');
+            }
+
+            // Remove pagination for export
+            $filters['per_page'] = 10000; // Large number to get all records
+            $paginatedCustomers = $this->customerRepository->getVendorCustomers($user->vendor->id, $filters);
+            $customers = $paginatedCustomers->items(); // Get the actual items from pagination
+
+            $exportData = [];
+            foreach ($customers as $customer) {
+                $exportData[] = [
+                    'id' => $customer->id,
+                    'name' => ($customer->first_name ?? '') . ' ' . ($customer->last_name ?? ''),
+                    'email' => $customer->email ?? '',
+                    'total_orders' => $customer->vendor_orders_count ?? 0,
+                    'completed_orders' => $customer->vendor_completed_orders_count ?? 0,
+                    'total_spent' => $customer->vendor_total_spent ?? 0,
+                    'first_order' => $customer->orders->first()?->created_at?->format('Y-m-d') ?? null,
+                    'last_order' => $customer->orders->last()?->created_at?->format('Y-m-d') ?? null,
+                    'registered_at' => $customer->created_at?->format('Y-m-d') ?? null,
+                ];
+            }
+
+            return $exportData;
+        } catch (\Exception $e) {
+            Log::error('Export vendor customers failed: ' . $e->getMessage(), [
+                'user_id' => Auth::id(),
+                'filters' => $filters,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        if (!$user->vendor) {
-            throw new \Exception('User is not associated with any vendor account.');
-        }
-
-        // Remove pagination for export
-        $filters['per_page'] = 10000; // Large number to get all records
-        $customers = $this->customerRepository->getVendorCustomers($user->vendor->id, $filters);
-
-        $exportData = [];
-        foreach ($customers as $customer) {
-            $exportData[] = [
-                'id' => $customer->id,
-                'name' => $customer->first_name . ' ' . $customer->last_name,
-                'email' => $customer->email,
-                'total_orders' => $customer->vendor_orders_count,
-                'completed_orders' => $customer->vendor_completed_orders_count,
-                'total_spent' => $customer->vendor_total_spent ?? 0,
-                'first_order' => $customer->orders->first()?->created_at?->format('Y-m-d'),
-                'last_order' => $customer->orders->last()?->created_at?->format('Y-m-d'),
-                'registered_at' => $customer->created_at->format('Y-m-d'),
-            ];
-        }
-
-        return $exportData;
     }
 
     /**

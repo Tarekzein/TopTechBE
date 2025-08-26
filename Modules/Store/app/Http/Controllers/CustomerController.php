@@ -584,7 +584,20 @@ class CustomerController extends Controller
                 'search', 'date_from', 'date_to', 'min_orders', 'min_spent'
             ]);
 
-            $exportData = $this->customerService->exportVendorCustomersData($filters);
+            try {
+                $exportData = $this->customerService->exportVendorCustomersData($filters);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Export failed: ' . $e->getMessage(),
+                    'debug' => [
+                        'user' => auth()->user() ? auth()->user()->id : 'No user',
+                        'vendor' => auth()->user() && auth()->user()->vendor ? auth()->user()->vendor->id : 'No vendor',
+                        'filters' => $filters,
+                        'trace' => $e->getTraceAsString()
+                    ]
+                ], 500);
+            }
             $format = $request->input('format', 'json');
 
             if ($format === 'csv') {
