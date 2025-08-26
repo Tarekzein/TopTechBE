@@ -25,7 +25,7 @@ class CustomerRepository
             ->withCount([
                 'orders',
                 'orders as completed_orders_count' => function ($query) {
-                    $query->where('status', 'completed');
+                    $query->where('status', 'delivered');
                 }
             ])
             ->withSum('orders', 'total');
@@ -64,7 +64,7 @@ class CustomerRepository
                 });
             },
             'orders as vendor_completed_orders_count' => function ($query) use ($vendorId) {
-                $query->where('status', 'completed')
+                $query->where('status', 'delivered')
                     ->whereHas('items.product', function ($q) use ($vendorId) {
                         $q->where('vendor_id', $vendorId);
                     });
@@ -107,7 +107,7 @@ class CustomerRepository
             ->withCount([
                 'orders',
                 'orders as completed_orders_count' => function ($query) {
-                    $query->where('status', 'completed');
+                    $query->where('status', 'delivered');
                 },
                 'orders as pending_orders_count' => function ($query) {
                     $query->where('status', 'pending');
@@ -147,7 +147,7 @@ class CustomerRepository
                 });
             },
             'orders as vendor_completed_orders_count' => function ($query) use ($vendorId) {
-                $query->where('status', 'completed')
+                $query->where('status', 'delivered')
                     ->whereHas('items.product', function ($q) use ($vendorId) {
                         $q->where('vendor_id', $vendorId);
                     });
