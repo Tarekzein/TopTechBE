@@ -3,7 +3,7 @@
 namespace Modules\Blog\App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-
+use Illuminate\Validation\Rule;
 class BlogCategoryRequest extends FormRequest
 {
     public function authorize(): bool
@@ -13,16 +13,22 @@ class BlogCategoryRequest extends FormRequest
 
     public function rules(): array
     {
+        
+
         $rules = [
             'name' => 'required|string|max:255',
             'slug' => 'required|string|max:255|unique:blog_categories,slug',
             'description' => 'nullable|string|max:1000',
-            'parent_id' => 'nullable|exists:blog_categories,id',
+            'parent_id' => [
+                'nullable',
+                Rule::exists('blog_categories', 'id')->whereNull('deleted_at'),
+            ],
             'order' => 'nullable|integer|min:0',
             'is_active' => 'boolean',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:1000',
         ];
+
 
         // If updating, ignore unique rule for current category
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
