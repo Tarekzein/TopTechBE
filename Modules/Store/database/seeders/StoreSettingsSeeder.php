@@ -87,6 +87,18 @@ class StoreSettingsSeeder extends Seeder
                 'is_default' => false,
                 'exchange_rate' => 0.790000,
             ],
+            [
+                'code' => 'EGP',
+                'name' => 'Egyptian Pound',
+                'symbol' => 'EGP',
+                'position' => 'before',
+                'decimal_places' => 2,
+                'decimal_separator' => '.',
+                'thousands_separator' => ',',
+                'is_active' => true,
+                'is_default' => false,
+                'exchange_rate' => 1.000000,
+            ]
         ];
 
         foreach ($currencies as $currency) {
@@ -162,6 +174,7 @@ class StoreSettingsSeeder extends Seeder
                     'USD' => 'US Dollar',
                     'EUR' => 'Euro',
                     'GBP' => 'British Pound',
+                    'EGP' => 'Egyptian Pound',
                 ],
                 'display_order' => 1,
             ],
@@ -269,7 +282,7 @@ class StoreSettingsSeeder extends Seeder
         $this->settingService->setSettingValue('store_name', 'My Store');
         $this->settingService->setSettingValue('store_description', 'Welcome to our online store!');
         $this->settingService->setSettingValue('store_email', 'store@example.com');
-        $this->settingService->setSettingValue('currency_code', 'USD');
+        $this->settingService->setSettingValue('currency_code', 'EGP');
         $this->settingService->setSettingValue('currency_position', 'before');
         $this->settingService->setSettingValue('currency_decimal_places', 2);
         $this->settingService->setSettingValue('currency_decimal_separator', '.');

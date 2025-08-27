@@ -11,6 +11,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Modules\Vendor\Models\Vendor;
 use Modules\Store\Models\Order;
+use Modules\Store\Models\Wallet;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -55,6 +56,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function orders()
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function wallet()
+    {
+        return $this->hasOne(Wallet::class);
     }
 
     /**

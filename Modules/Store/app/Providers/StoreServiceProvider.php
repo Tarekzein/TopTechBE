@@ -10,8 +10,12 @@ use Modules\Store\App\Console\Commands\UpdateExchangeRates;
 use Modules\Store\App\Repositories\CurrencyRepository;
 use Modules\Store\App\Repositories\SettingRepository;
 use Modules\Store\Repositories\OrderRepository;
+use Modules\Store\Repositories\WalletRepository;
 use Modules\Store\App\Services\CurrencyService;
 use Modules\Store\App\Services\SettingService;
+use Modules\Store\Services\WalletService;
+use Modules\Store\Services\WalletTransactionService;
+use Modules\Store\Services\BannerService;
 use Modules\Store\Interfaces\CurrencyRepositoryInterface;
 use Modules\Store\Interfaces\CurrencyServiceInterface;
 use Modules\Store\Interfaces\SettingRepositoryInterface;
@@ -20,6 +24,8 @@ use Modules\Store\Models\BillingAddress;
 use Modules\Store\Models\ShippingAddress;
 use Modules\Store\Policies\BillingAddressPolicy;
 use Modules\Store\Policies\ShippingAddressPolicy;
+use Modules\Store\Models\Order;
+use Modules\Store\Observers\OrderObserver;
 use Nwidart\Modules\Traits\PathNamespace;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -51,6 +57,7 @@ class StoreServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->name, 'database/migrations'));
         $this->registerPolicies();
+        $this->registerObservers();
         $this->loadRoutesFrom(module_path($this->name, 'routes/api.php'));
         $this->publishes([
             module_path($this->name, 'config/store.php') => config_path('store.php'),
@@ -181,6 +188,11 @@ class StoreServiceProvider extends ServiceProvider
         Gate::policy(ShippingAddress::class, ShippingAddressPolicy::class);
     }
 
+    protected function registerObservers()
+    {
+        Order::observe(OrderObserver::class);
+    }
+
     protected function bindRepositories()
     {
         $this->app->bind(CurrencyRepositoryInterface::class, CurrencyRepository::class);
@@ -188,11 +200,23 @@ class StoreServiceProvider extends ServiceProvider
         $this->app->bind(OrderRepository::class, function ($app) {
             return new OrderRepository();
         });
+        $this->app->bind(WalletRepository::class, function ($app) {
+            return new WalletRepository();
+        });
     }
 
     protected function bindServices()
     {
         $this->app->bind(CurrencyServiceInterface::class, CurrencyService::class);
         $this->app->bind(SettingServiceInterface::class, SettingService::class);
+        $this->app->bind(WalletService::class, function ($app) {
+            return new WalletService();
+        });
+        $this->app->bind(WalletTransactionService::class, function ($app) {
+            return new WalletTransactionService();
+        });
+        $this->app->bind(BannerService::class, function ($app) {
+            return new BannerService();
+        });
     }
 }

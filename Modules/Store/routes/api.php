@@ -15,6 +15,9 @@ use Modules\Store\Http\Controllers\SettingController;
 use Modules\Store\Http\Controllers\CurrencyController;
 use Modules\Store\Http\Controllers\AnalyticsController;
 use Modules\Store\Http\Controllers\CustomerController;
+use Modules\Store\Http\Controllers\WalletController;
+use Modules\Store\Http\Controllers\WalletTransactionController;
+use Modules\Store\Http\Controllers\BannerController;
 /*
 |--------------------------------------------------------------------------
 | Store Module API Routes
@@ -229,6 +232,57 @@ Route::prefix('store')->group(function () {
 
         // General customer summary (accessible by both admin and vendor)
         Route::get('/customers/summary', [CustomerController::class, 'summary']);
+    });
+
+    // Wallet Routes
+    Route::middleware(['auth:sanctum'])->prefix('wallet')->group(function () {
+        // User wallet routes
+        Route::get('/', [WalletController::class, 'getWallet']);
+        Route::get('/transactions', [WalletController::class, 'getTransactions']);
+        Route::get('/statistics', [WalletController::class, 'getStatistics']);
+        Route::post('/withdraw', [WalletController::class, 'withdrawFunds']);
+        Route::get('/transactions/search', [WalletController::class, 'searchTransactions']);
+        Route::get('/transactions/date-range', [WalletController::class, 'getTransactionsByDateRange']);
+        Route::get('/transactions/{transactionId}', [WalletController::class, 'getTransactionDetails']);
+
+        // Admin routes
+        Route::middleware(['role:admin|super-admin'])->group(function () {
+            Route::post('/add-funds', [WalletController::class, 'addFunds']);
+        });
+    });
+
+    // Wallet Transaction Routes
+    Route::middleware(['auth:sanctum'])->prefix('wallet-transactions')->group(function () {
+        Route::post('/refund', [WalletTransactionController::class, 'processRefund']);
+        Route::get('/statistics', [WalletTransactionController::class, 'getStatistics']);
+        Route::get('/refund-history', [WalletTransactionController::class, 'getRefundHistory']);
+        Route::get('/{transactionId}', [WalletTransactionController::class, 'getTransaction']);
+
+        // Admin routes
+        Route::middleware(['role:admin|super-admin'])->group(function () {
+            Route::put('/{transactionId}/status', [WalletTransactionController::class, 'updateStatus']);
+        });
+    });
+
+    // Banner Routes
+    Route::prefix('banners')->group(function () {
+        // Public routes for getting banners
+        Route::get('/position', [BannerController::class, 'getBannersByPosition']);
+        Route::post('/{banner}/impression', [BannerController::class, 'recordImpression']);
+        Route::post('/{banner}/click', [BannerController::class, 'recordClick']);
+
+        // Admin routes
+        Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
+            Route::get('/', [BannerController::class, 'index']);
+            Route::post('/', [BannerController::class, 'store']);
+            Route::get('/types-positions', [BannerController::class, 'getTypesAndPositions']);
+            Route::get('/statistics', [BannerController::class, 'statistics']);
+            Route::get('/{banner}', [BannerController::class, 'show']);
+            Route::put('/{banner}', [BannerController::class, 'update']);
+            Route::delete('/{banner}', [BannerController::class, 'destroy']);
+            Route::patch('/{banner}/toggle-status', [BannerController::class, 'toggleStatus']);
+            Route::put('/sort-order', [BannerController::class, 'updateSortOrder']);
+        });
     });
 });
 
