@@ -375,4 +375,128 @@ class AnalyticsService
             ]
         ];
     }
+
+    /**
+     * Get analytics for all vendors (admin only)
+     */
+    public function getAllVendorsAnalytics(Request $request): array
+    {
+        try {
+            $period = $request->get('period', '30d');
+            $this->validatePeriod($period);
+            
+            Log::info('Analytics Service: Fetching all vendors analytics', [
+                'period' => $period
+            ]);
+            
+            $analytics = $this->analyticsRepository->getAllVendorsAnalytics($period);
+            
+            if (empty($analytics)) {
+                Log::warning('Analytics Service: No analytics data found for all vendors', [
+                    'period' => $period
+                ]);
+                
+                return [
+                    'success' => true,
+                    'data' => [
+                        'overview' => $this->getEmptyOverviewData(),
+                        'performance' => $this->getEmptyPerformanceData(),
+                        'top_vendors' => [],
+                        'sales_trend' => [],
+                        'vendor_breakdown' => [],
+                        'period' => $period
+                    ]
+                ];
+            }
+
+            $result = [
+                'success' => true,
+                'data' => [
+                    'overview' => $this->formatAllVendorsOverviewData($analytics),
+                    'performance' => $this->formatAllVendorsPerformanceData($analytics['performance']),
+                    'top_vendors' => $analytics['top_vendors'],
+                    'sales_trend' => $analytics['sales_trend'],
+                    'vendor_breakdown' => $analytics['vendor_breakdown'],
+                    'period' => $period
+                ]
+            ];
+            
+            Log::info('Analytics Service: All vendors analytics processed successfully', [
+                'has_data' => !empty($analytics)
+            ]);
+            
+            return $result;
+            
+        } catch (InvalidArgumentException $e) {
+            Log::error('Analytics Service: Invalid argument in all vendors analytics', [
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Analytics Service: Failed to get all vendors analytics', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Format all vendors overview data for frontend
+     */
+    private function formatAllVendorsOverviewData(array $analytics): array
+    {
+        return [
+            'total_revenue' => [
+                'value' => $analytics['revenue']['total'],
+                'change' => $analytics['revenue']['change'],
+                'currency' => $analytics['revenue']['currency']
+            ],
+            'total_orders' => [
+                'value' => $analytics['orders']['total'],
+                'change' => $analytics['orders']['change']
+            ],
+            'total_customers' => [
+                'value' => $analytics['customers']['total'],
+                'change' => $analytics['customers']['change']
+            ],
+            'total_products' => [
+                'value' => $analytics['products']['total'],
+                'change' => $analytics['products']['change']
+            ],
+            'total_vendors' => [
+                'value' => $analytics['vendors']['total'],
+                'change' => $analytics['vendors']['change']
+            ]
+        ];
+    }
+
+    /**
+     * Format all vendors performance data for frontend
+     */
+    private function formatAllVendorsPerformanceData(array $performance): array
+    {
+        return [
+            'average_order_value' => [
+                'value' => $performance['average_order_value'],
+                'currency' => 'USD'
+            ],
+            'conversion_rate' => [
+                'value' => $performance['conversion_rate'],
+                'unit' => '%'
+            ],
+            'return_rate' => [
+                'value' => $performance['return_rate'],
+                'unit' => '%'
+            ],
+            'customer_satisfaction' => [
+                'value' => $performance['customer_satisfaction'],
+                'unit' => '/5'
+            ],
+            'average_vendor_revenue' => [
+                'value' => $performance['average_vendor_revenue'],
+                'currency' => 'USD'
+            ]
+        ];
+    }
 }

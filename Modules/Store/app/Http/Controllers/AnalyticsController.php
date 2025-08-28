@@ -532,18 +532,36 @@ class AnalyticsController extends Controller
                 ], 403);
             }
 
+            // Validate request parameters
+            $request->validate([
+                'period' => 'sometimes|string|in:7d,30d,90d,1y'
+            ]);
+
             Log::info('Analytics: Admin fetching all vendors analytics', [
+                'admin_user_id' => $request->user()->id,
+                'period' => $request->get('period', '30d')
+            ]);
+
+            $result = $this->analyticsService->getAllVendorsAnalytics($request);
+
+            Log::info('Analytics: All vendors analytics fetched successfully', [
+                'admin_user_id' => $request->user()->id,
+                'has_data' => !empty($result['data'])
+            ]);
+
+            return response()->json($result);
+
+        } catch (ValidationException $e) {
+            Log::warning('Analytics: Validation failed for all vendors request', [
+                'errors' => $e->errors(),
                 'admin_user_id' => $request->user()->id
             ]);
-
-            // This would require additional service method to aggregate all vendors
-            // For now, return a placeholder response
+            
             return response()->json([
-                'success' => true,
-                'message' => 'All vendors analytics endpoint - implementation pending',
-                'data' => []
-            ]);
-
+                'success' => false,
+                'message' => 'Invalid request parameters',
+                'errors' => $e->errors()
+            ], 422);
         } catch (\Exception $e) {
             Log::error('Analytics: Failed to fetch all vendors analytics', [
                 'error' => $e->getMessage(),

@@ -619,4 +619,450 @@ class AnalyticsRepository
 
         return [$previousStart, $previousEnd];
     }
+
+    /**
+     * Get analytics for all vendors
+     */
+    public function getAllVendorsAnalytics(string $period = '30d'): array
+    {
+        try {
+            $this->validatePeriod($period);
+            
+            Log::info('Analytics Repository: Fetching all vendors analytics', [
+                'period' => $period
+            ]);
+            
+            $dateRange = $this->getDateRange($period);
+            
+            $analytics = [
+                'revenue' => $this->getAllVendorsRevenueAnalytics($dateRange),
+                'orders' => $this->getAllVendorsOrdersAnalytics($dateRange),
+                'customers' => $this->getAllVendorsCustomersAnalytics($dateRange),
+                'products' => $this->getAllVendorsProductsAnalytics($dateRange),
+                'vendors' => $this->getAllVendorsCountAnalytics($dateRange),
+                'performance' => $this->getAllVendorsPerformanceMetrics($dateRange),
+                'top_vendors' => $this->getTopVendors($dateRange, 10),
+                'sales_trend' => $this->getAllVendorsSalesTrend($dateRange),
+                'vendor_breakdown' => $this->getVendorBreakdown($dateRange),
+            ];
+            
+            Log::info('Analytics Repository: All vendors analytics fetched successfully', [
+                'has_data' => !empty($analytics)
+            ]);
+            
+            return $analytics;
+            
+        } catch (InvalidArgumentException $e) {
+            Log::error('Analytics Repository: Invalid argument in getAllVendorsAnalytics', [
+                'error' => $e->getMessage(),
+                'period' => $period
+            ]);
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get all vendors analytics', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'period' => $period
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Get revenue analytics for all vendors
+     */
+    private function getAllVendorsRevenueAnalytics(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $currentRevenue = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->where('orders.payment_status', 'paid')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+            $previousRevenue = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->where('orders.payment_status', 'paid')
+                ->whereBetween('orders.created_at', $this->getPreviousDateRange($dateRange))
+                ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+            $change = $previousRevenue > 0 ? (($currentRevenue - $previousRevenue) / $previousRevenue) * 100 : 0;
+
+            return [
+                'total' => round($currentRevenue, 2),
+                'change' => round($change, 1),
+                'currency' => 'USD'
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get all vendors revenue analytics', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [
+                'total' => 0,
+                'change' => 0,
+                'currency' => 'USD'
+            ];
+        }
+    }
+
+    /**
+     * Get orders analytics for all vendors
+     */
+    private function getAllVendorsOrdersAnalytics(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $currentOrders = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->distinct('orders.id')
+                ->count('orders.id');
+
+            $previousOrders = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->whereBetween('orders.created_at', $this->getPreviousDateRange($dateRange))
+                ->distinct('orders.id')
+                ->count('orders.id');
+
+            $change = $previousOrders > 0 ? (($currentOrders - $previousOrders) / $previousOrders) * 100 : 0;
+
+            return [
+                'total' => $currentOrders,
+                'change' => round($change, 1)
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get all vendors orders analytics', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [
+                'total' => 0,
+                'change' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get customers analytics for all vendors
+     */
+    private function getAllVendorsCustomersAnalytics(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $currentCustomers = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->distinct('orders.user_id')
+                ->count('orders.user_id');
+
+            $previousCustomers = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->whereBetween('orders.created_at', $this->getPreviousDateRange($dateRange))
+                ->distinct('orders.user_id')
+                ->count('orders.user_id');
+
+            $change = $previousCustomers > 0 ? (($currentCustomers - $previousCustomers) / $previousCustomers) * 100 : 0;
+
+            return [
+                'total' => $currentCustomers,
+                'change' => round($change, 1)
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get all vendors customers analytics', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [
+                'total' => 0,
+                'change' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get products analytics for all vendors
+     */
+    private function getAllVendorsProductsAnalytics(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $currentProducts = Product::whereBetween('created_at', $dateRange)->count();
+            $previousProducts = Product::whereBetween('created_at', $this->getPreviousDateRange($dateRange))->count();
+
+            $change = $previousProducts > 0 ? (($currentProducts - $previousProducts) / $previousProducts) * 100 : 0;
+
+            return [
+                'total' => $currentProducts,
+                'change' => round($change, 1)
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get all vendors products analytics', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [
+                'total' => 0,
+                'change' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get vendors count analytics
+     */
+    private function getAllVendorsCountAnalytics(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $currentVendors = Product::whereBetween('created_at', $dateRange)
+                ->distinct('vendor_id')
+                ->count('vendor_id');
+
+            $previousVendors = Product::whereBetween('created_at', $this->getPreviousDateRange($dateRange))
+                ->distinct('vendor_id')
+                ->count('vendor_id');
+
+            $change = $previousVendors > 0 ? (($currentVendors - $previousVendors) / $previousVendors) * 100 : 0;
+
+            return [
+                'total' => $currentVendors,
+                'change' => round($change, 1)
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get vendors count analytics', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [
+                'total' => 0,
+                'change' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get performance metrics for all vendors
+     */
+    private function getAllVendorsPerformanceMetrics(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            // Average Order Value
+            $totalRevenue = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->where('orders.payment_status', 'paid')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+            $totalOrders = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->where('orders.payment_status', 'paid')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->distinct('orders.id')
+                ->count('orders.id');
+
+            $averageOrderValue = $totalOrders > 0 ? $totalRevenue / $totalOrders : 0;
+
+            // Average Vendor Revenue
+            $activeVendors = Product::whereBetween('created_at', $dateRange)
+                ->distinct('vendor_id')
+                ->count('vendor_id');
+
+            $averageVendorRevenue = $activeVendors > 0 ? $totalRevenue / $activeVendors : 0;
+
+            // Return Rate
+            $returnedOrders = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->where('orders.status', 'refunded')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->distinct('orders.id')
+                ->count('orders.id');
+
+            $returnRate = $totalOrders > 0 ? ($returnedOrders / $totalOrders) * 100 : 0;
+
+            return [
+                'average_order_value' => round($averageOrderValue, 2),
+                'conversion_rate' => 3.2, // Mock data
+                'return_rate' => round($returnRate, 1),
+                'customer_satisfaction' => 4.6, // Mock data
+                'average_vendor_revenue' => round($averageVendorRevenue, 2)
+            ];
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get all vendors performance metrics', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [
+                'average_order_value' => 0,
+                'conversion_rate' => 0,
+                'return_rate' => 0,
+                'customer_satisfaction' => 0,
+                'average_vendor_revenue' => 0
+            ];
+        }
+    }
+
+    /**
+     * Get top performing vendors
+     */
+    private function getTopVendors(array $dateRange, int $limit = 10): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $vendors = Product::join('order_items', 'products.id', '=', 'order_items.product_id')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->join('users', 'products.vendor_id', '=', 'users.id')
+                ->where('orders.payment_status', 'paid')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->select([
+                    'users.id as vendor_id',
+                    'users.first_name',
+                    'users.last_name',
+                    DB::raw('SUM(order_items.quantity * order_items.price) as revenue'),
+                    DB::raw('COUNT(DISTINCT orders.id) as orders_count'),
+                    DB::raw('COUNT(DISTINCT orders.user_id) as customers_count')
+                ])
+                ->groupBy('users.id', 'users.first_name', 'users.last_name')
+                ->orderBy('revenue', 'desc')
+                ->limit($limit)
+                ->get()
+                ->map(function ($vendor, $index) {
+                    return [
+                        'id' => $vendor->vendor_id,
+                        'name' => $vendor->first_name . ' ' . $vendor->last_name,
+                        'revenue' => round($vendor->revenue, 2),
+                        'orders' => $vendor->orders_count,
+                        'customers' => $vendor->customers_count,
+                        'rank' => $index + 1
+                    ];
+                })
+                ->toArray();
+            
+            return $vendors;
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get top vendors', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [];
+        }
+    }
+
+    /**
+     * Get all vendors sales trend
+     */
+    private function getAllVendorsSalesTrend(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $startDate = Carbon::parse($dateRange[0]);
+            $endDate = Carbon::parse($dateRange[1]);
+            
+            $trend = [];
+            $current = $startDate->copy();
+
+            while ($current <= $endDate) {
+                $monthStart = $current->copy()->startOfMonth();
+                $monthEnd = $current->copy()->endOfMonth();
+
+                $monthlyRevenue = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'order_items.product_id', '=', 'products.id')
+                    ->where('orders.payment_status', 'paid')
+                    ->whereBetween('orders.created_at', [$monthStart, $monthEnd])
+                    ->sum(DB::raw('order_items.quantity * order_items.price'));
+
+                $monthlyOrders = Order::join('order_items', 'orders.id', '=', 'order_items.order_id')
+                    ->join('products', 'order_items.product_id', '=', 'products.id')
+                    ->where('orders.payment_status', 'paid')
+                    ->whereBetween('orders.created_at', [$monthStart, $monthEnd])
+                    ->distinct('orders.id')
+                    ->count('orders.id');
+
+                $trend[] = [
+                    'month' => $current->format('M'),
+                    'sales' => round($monthlyRevenue, 2),
+                    'orders' => $monthlyOrders
+                ];
+
+                $current->addMonth();
+            }
+
+            return $trend;
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get all vendors sales trend', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [];
+        }
+    }
+
+    /**
+     * Get vendor breakdown by revenue
+     */
+    private function getVendorBreakdown(array $dateRange): array
+    {
+        try {
+            $this->validateDateRange($dateRange);
+            
+            $breakdown = Product::join('order_items', 'products.id', '=', 'order_items.product_id')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->join('users', 'products.vendor_id', '=', 'users.id')
+                ->where('orders.payment_status', 'paid')
+                ->whereBetween('orders.created_at', $dateRange)
+                ->select([
+                    'users.id as vendor_id',
+                    'users.first_name',
+                    'users.last_name',
+                    DB::raw('SUM(order_items.quantity * order_items.price) as revenue')
+                ])
+                ->groupBy('users.id', 'users.first_name', 'users.last_name')
+                ->orderBy('revenue', 'desc')
+                ->get()
+                ->map(function ($vendor) {
+                    return [
+                        'id' => $vendor->vendor_id,
+                        'name' => $vendor->first_name . ' ' . $vendor->last_name,
+                        'revenue' => round($vendor->revenue, 2)
+                    ];
+                })
+                ->toArray();
+            
+            return $breakdown;
+            
+        } catch (\Exception $e) {
+            Log::error('Analytics Repository: Failed to get vendor breakdown', [
+                'error' => $e->getMessage(),
+                'date_range' => $dateRange
+            ]);
+            
+            return [];
+        }
+    }
 }
