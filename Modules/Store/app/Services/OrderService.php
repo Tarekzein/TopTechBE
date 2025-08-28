@@ -453,12 +453,13 @@ class OrderService
             $query->whereDate('created_at', '<=', $filters['date_to']);
         }
 
-        if (isset($filters['search'])) {
-            $search = $filters['search'];
+        if (isset($filters['search']) && !empty(trim($filters['search']))) {
+            $search = trim($filters['search']);
             $query->where(function ($q) use ($search) {
                 $q->where('order_number', 'like', "%{$search}%")
                   ->orWhereHas('user', function ($q) use ($search) {
-                      $q->where('name', 'like', "%{$search}%")
+                      $q->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%");
                   });
             });
