@@ -357,11 +357,28 @@ class OrderController extends Controller
                 'current_page' => $orders->currentPage(),
                 'last_page' => $orders->lastPage(),
             ]);
-        } catch (\Exception $e) {
-            Log::error($e);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Vendor orders validation failed', [
+                'errors' => $e->errors(),
+                'user_id' => Auth::id()
+            ]);
+            
             return response()->json([
-                'message' => $e->getMessage(),
-            ], $e->getCode());
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Vendor orders fetch failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => Auth::id(),
+                'filters' => $request->all()
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to fetch orders. Please try again later.',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
         }
     }
 

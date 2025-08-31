@@ -31,10 +31,7 @@ Route::middleware(['auth:sanctum', 'role:vendor'])->prefix('vendor/financial')->
     Route::get('/reports', [VendorFinancialController::class, 'getFinancialReports']);
 });
 
-// General vendor routes (if needed)
-//Route::middleware(['auth:sanctum'])->group(function () {
-//    Route::apiResource('vendor', VendorController::class)->names('vendor');
-//});
+
 // General vendor CRUD routes - requires authentication and appropriate permissions
 Route::middleware(['auth:sanctum'])->group(function () {
     // Get all vendors
@@ -51,4 +48,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Delete vendor
     Route::delete('vendors/{id}', [VendorController::class, 'destroy'])->name('vendors.destroy');
+
 });
+
