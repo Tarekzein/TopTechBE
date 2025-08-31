@@ -17,7 +17,7 @@ class BlogCategoryRequest extends FormRequest
 
         $rules = [
             'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:blog_categories,slug',
+            'slug' => 'string|max:255|unique:blog_categories,slug',
             'description' => 'nullable|string|max:1000',
             'parent_id' => [
                 'nullable',
@@ -32,7 +32,7 @@ class BlogCategoryRequest extends FormRequest
 
         // If updating, ignore unique rule for current category
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $rules['slug'] = 'required|string|max:255|unique:blog_categories,slug,' . $this->route('id');
+            $rules['slug'] = 'string|max:255|unique:blog_categories,slug,' . $this->route('id');
         }
 
         return $rules;

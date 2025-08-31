@@ -7,15 +7,20 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Modules\Blog\App\Services\Interfaces\PostServiceInterface;
 use Modules\Blog\App\Http\Requests\PostRequest;
+use Modules\Common\Services\CloudImageService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Cloudinary\Api\Exception\ApiError;
 
 class PostController extends Controller
 {
     protected PostServiceInterface $postService;
+    protected CloudImageService $cloudImageService;
 
-    public function __construct(PostServiceInterface $postService)
+    public function __construct(PostServiceInterface $postService, CloudImageService $cloudImageService)
     {
         $this->postService = $postService;
+        $this->cloudImageService = $cloudImageService;
     }
 
     public function index(Request $request): JsonResponse
@@ -27,10 +32,25 @@ class PostController extends Controller
 
     public function store(PostRequest $request): JsonResponse
     {
-        $data = $request->validated();
-        $data['author_id'] = Auth::id();
-        $post = $this->postService->create($data);
-        return response()->json($post, 201);
+        try {
+            $data = $request->validated();
+            $data['author_id'] = Auth::id();
+            
+            // Handle featured image upload
+            if ($request->hasFile('featured_image')) {
+                $featuredImageUrl = $this->uploadFeaturedImage($request->file('featured_image'));
+                $data['featured_image'] = $featuredImageUrl;
+            }
+            
+            $post = $this->postService->create($data);
+            return response()->json($post, 201);
+        } catch (ApiError $e) {
+            Log::error('Failed to upload featured image', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to upload featured image'], 500);
+        } catch (\Exception $e) {
+            Log::error('Failed to create post', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to create post'], 500);
+        }
     }
 
     public function show(string $slug): JsonResponse
@@ -45,12 +65,27 @@ class PostController extends Controller
 
     public function update(PostRequest $request, int $id): JsonResponse
     {
-        $data = $request->validated();
-        $updated = $this->postService->update($id, $data);
-        if (!$updated) {
-            return response()->json(['message' => 'Post not found'], 404);
+        try {
+            $data = $request->validated();
+            
+            // Handle featured image upload if a new image is provided
+            if ($request->hasFile('featured_image')) {
+                $featuredImageUrl = $this->uploadFeaturedImage($request->file('featured_image'));
+                $data['featured_image'] = $featuredImageUrl;
+            }
+            
+            $updated = $this->postService->update($id, $data);
+            if (!$updated) {
+                return response()->json(['message' => 'Post not found'], 404);
+            }
+            return response()->json(['message' => 'Post updated successfully']);
+        } catch (ApiError $e) {
+            Log::error('Failed to upload featured image', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to upload featured image'], 500);
+        } catch (\Exception $e) {
+            Log::error('Failed to update post', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update post'], 500);
         }
-        return response()->json(['message' => 'Post updated successfully']);
     }
 
     public function destroy(int $id): JsonResponse
@@ -129,4 +164,68 @@ class PostController extends Controller
         $posts = $this->postService->getFeaturedPosts();
         return response()->json($posts);
     }
-} 
+
+    /**
+     * Upload featured image to Cloudinary
+     *
+     * @param \Illuminate\Http\UploadedFile $file
+     * @return string The Cloudinary URL of the uploaded image
+     * @throws ApiError
+     */
+    private function uploadFeaturedImage($file): string
+    {
+        $options = [
+            'folder' => 'blog/featured-images',
+            'public_id' => 'featured_' . time() . '_' . uniqid(),
+            'overwrite' => true,
+            'transformation' => [
+                'width' => 1200,
+                'height' => 630,
+                'crop' => 'fill',
+                'quality' => 'auto'
+            ]
+        ];
+
+        $result = $this->cloudImageService->upload($file->getRealPath(), $options);
+        return $result['secure_url'];
+    }
+
+
+
+    /**
+     * Update featured image for an existing post
+     *
+     * @param Request $request
+     * @param int $id
+     * @return JsonResponse
+     */
+    public function updateFeaturedImage(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'featured_image' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:5120'
+        ]);
+
+        try {
+            $post = $this->postService->find($id);
+            if (!$post) {
+                return response()->json(['message' => 'Post not found'], 404);
+            }
+
+            $featuredImageUrl = $this->uploadFeaturedImage($request->file('featured_image'));
+            
+            $this->postService->update($id, ['featured_image' => $featuredImageUrl]);
+
+            return response()->json([
+                'message' => 'Featured image updated successfully',
+                'featured_image_url' => $featuredImageUrl
+            ]);
+
+        } catch (ApiError $e) {
+            Log::error('Failed to update featured image', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update featured image'], 500);
+        } catch (\Exception $e) {
+            Log::error('Failed to update featured image', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Failed to update featured image'], 500);
+        }
+    }
+}

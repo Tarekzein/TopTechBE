@@ -15,10 +15,10 @@ class PostRequest extends FormRequest
     {
         $rules = [
             'title' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:blog_posts,slug,' . ($this->post ?? ''),
+            'slug' => 'string|max:255|unique:blog_posts,slug,' . ($this->post ?? ''),
             'excerpt' => 'nullable|string|max:1000',
             'content' => 'required|string',
-            'featured_image' => 'nullable|string|max:255',
+            'featured_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120', // Updated for file upload
             'category_id' => 'required|exists:blog_categories,id',
             'status' => 'required|in:draft,published,archived',
             'published_at' => 'nullable|date',
@@ -30,7 +30,12 @@ class PostRequest extends FormRequest
         ];
 
         if ($this->isMethod('POST')) {
-            $rules['slug'] = 'required|string|max:255|unique:blog_posts,slug';
+            $rules['slug'] = 'string|max:255|unique:blog_posts,slug';
+        }
+
+        // For updates, make featured_image optional if it's not being changed
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['featured_image'] = 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:5120';
         }
 
         return $rules;
@@ -49,7 +54,10 @@ class PostRequest extends FormRequest
             'status.required' => 'Please select a status.',
             'status.in' => 'The selected status is invalid.',
             'published_at.date' => 'The published date must be a valid date.',
+            'featured_image.image' => 'The featured image must be an image file.',
+            'featured_image.mimes' => 'The featured image must be a file of type: jpeg, png, jpg, gif, webp.',
+            'featured_image.max' => 'The featured image may not be greater than 5MB.',
             'tags.*.exists' => 'One or more selected tags are invalid.'
         ];
     }
-} 
+}
