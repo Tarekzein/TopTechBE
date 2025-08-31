@@ -15,7 +15,7 @@ class TagRequest extends FormRequest
     {
         $rules = [
             'name' => 'required|string|max:255',
-            'slug' => 'required|string|max:255|unique:blog_tags,slug',
+            'slug' => 'string|max:255|unique:blog_tags,slug',
             'description' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
             'meta_title' => 'nullable|string|max:255',
@@ -24,7 +24,7 @@ class TagRequest extends FormRequest
 
         // If updating, ignore unique rule for current tag
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $rules['slug'] = 'required|string|max:255|unique:blog_tags,slug,' . $this->route('id');
+            $rules['slug'] = 'string|max:255|unique:blog_tags,slug,' . $this->route('id');
         }
 
         return $rules;

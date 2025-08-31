@@ -7,14 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-
+use Cviebrock\EloquentSluggable\Sluggable; 
 class BlogCategory extends Model
 {
     use HasFactory, SoftDeletes;
-    use \Cviebrock\EloquentSluggable\Sluggable;
+    use Sluggable;
     protected $table = 'blog_categories';
 
-    protected $fillable = [
+     protected $fillable = [
         'name',
         'slug',
         'description',
@@ -29,7 +29,26 @@ class BlogCategory extends Model
         'is_active' => 'boolean',
         'order' => 'integer'
     ];
+    /**
+     * Return the sluggable configuration array for this model.
+     */
+    public function sluggable(): array
+    {
+        return [
+            'slug' => [
+                'source' => 'name',
+                'onUpdate' => true, // لتحديث الـ slug عند تغيير الاسم
+            ]
+        ];
+    }
 
+    /**
+     * الحصول على الطريق المخصص للنماذج.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
     public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');
@@ -72,12 +91,12 @@ class BlogCategory extends Model
         return $query->where('parent_id', $parentId);
     }
 
-    public function sluggable(): array
-    {
-        return [
-            'slug' => [
-                'source' => 'name'
-            ]
-        ];
-    }
+    // public function sluggable(): array
+    // {
+    //     return [
+    //         'slug' => [
+    //             'source' => 'name'
+    //         ]
+    //     ];
+    // }
 }
