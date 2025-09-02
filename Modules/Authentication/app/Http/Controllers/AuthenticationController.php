@@ -8,7 +8,7 @@ use Modules\Authentication\Interfaces\AuthenticationServiceInterface;
 use Illuminate\Support\Facades\Auth;
 use Exception;
 use Illuminate\Validation\ValidationException;
-
+use App\Models\User;
 class AuthenticationController extends Controller
 {
     protected $auth_service;
@@ -234,6 +234,68 @@ class AuthenticationController extends Controller
                 'message' => 'Password reset failed',
                 'error' => $e->getMessage()
             ], 400);
+        }
+    }
+    // admin
+    public function adminRegister(Request $request)
+{
+    try {
+        $data = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name'  => 'required|string|max:255',
+            'email'      => 'required|email|unique:users,email',
+            'password'   => 'required|min:6|confirmed',
+        ]);
+
+        $result = $this->auth_service->adminRegister($data);
+
+        return response()->json($result, 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors'  => $e->errors()
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'message' => 'Admin registration failed',
+            'error'   => $e->getMessage()
+        ], 500);
+    }
+}
+
+public function updateUserRoles(Request $request, $id)
+    {
+        try {
+            $data = $request->validate([
+                'roles'   => 'required|array',
+                'roles.*' => 'string|exists:roles,name', // كل role لازم يكون متسجل في جدول roles
+            ]);
+
+            $user = User::findOrFail($id);
+
+            // استبدال كل الـ roles باللي جاي في الريكوست
+            $user->syncRoles($data['roles']);
+            $user->load('roles'); // نرجع الأدوار مع اليوزر
+
+            return response()->json([
+                'message' => 'User roles updated successfully',
+                'user'    => $user
+            ], 200);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors'  => $e->errors()
+            ], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'User not found',
+            ], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to update user roles',
+                'error'   => $e->getMessage()
+            ], 500);
         }
     }
 }

@@ -24,5 +24,11 @@ Route::prefix('auth')->group(function () {
     Route::post('forgot-password', [AuthenticationController::class, 'forgotPassword']);
     Route::post('verify-otp', [AuthenticationController::class, 'verifyOtp']);
     Route::post('reset-password', [AuthenticationController::class, 'resetPassword']);
+    // admin
+    Route::middleware(['auth:sanctum', 'role:super-admin'])->post('/admin-register', [AuthenticationController::class, 'adminRegister']);
+    Route::middleware(['auth:sanctum', 'role:super-admin'])->put(
+    '/users/{id}/roles',
+    [AuthenticationController::class, 'updateUserRoles']
+);
 
 });

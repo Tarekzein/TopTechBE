@@ -263,4 +263,108 @@ class WalletController extends Controller
             ], 500);
         }
     }
+    /**
+ * 🟢 Get all wallets (admin only)
+ */
+public function getAllWallets(Request $request): JsonResponse
+{
+    try {
+        if (!Auth::user()->hasRole(['admin', 'super-admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: Only admin can view all wallets'
+            ], 403);
+        }
+
+        $wallets = \Modules\Store\Models\Wallet::with('user')
+            ->paginate($request->get('per_page', 20));
+
+        return response()->json([
+            'success' => true,
+            'data' => $wallets
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to get wallets',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * 🟢 Get total balance of all wallets
+ */
+public function getTotalSystemBalance(): JsonResponse
+{
+    try {
+        if (!Auth::user()->hasRole(['admin', 'super-admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: Only admin can view system balance'
+            ], 403);
+        }
+
+        // 🔹 Group balance by currency
+        $balances = \Modules\Store\Models\Wallet::select('currency')
+            ->selectRaw('SUM(balance) as total_balance')
+            ->groupBy('currency')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $balances
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to get total balance',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Withdraw funds from a user's wallet (Admin only)
+ */
+public function withdrawFundsAdmin(Request $request): JsonResponse
+{
+    try {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'amount' => 'required|numeric|min:0.01',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        // 🟢 Fetch target user
+        $user = User::findOrFail($request->user_id);
+
+        // 🟢 Deduct funds
+        $transaction = $this->walletService->deductFunds(
+            $user,
+            $request->amount,
+            $request->description
+        );
+
+        if (!$transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Insufficient funds or failed to withdraw'
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Funds withdrawn successfully by admin',
+            'data' => $transaction
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to withdraw funds as admin',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
 }

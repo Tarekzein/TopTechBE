@@ -81,4 +81,9 @@ class UserRepository implements UserRepositoryInterface
             throw new Exception('Error deleting user: ' . $e->getMessage());
         }
     }
+    public function getWithRoles($perPage = 20)
+    {
+        return \App\Models\User::with('roles')->paginate($perPage);
+    }
+    
 }
