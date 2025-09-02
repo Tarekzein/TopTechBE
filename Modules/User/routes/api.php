@@ -17,3 +17,5 @@ use Modules\User\Http\Controllers\UserController;
 Route::middleware(['auth:sanctum'])->group(function () {
    Route::apiResource('users', UserController::class)->names('users');
 });
+Route::get('/user/roles', [UserController::class, 'getWithRoles'])
+    ->middleware(['auth:sanctum', 'role_or_permission:admin|super-admin']);

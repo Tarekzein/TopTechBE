@@ -182,4 +182,10 @@ class AuthenticationService implements AuthenticationServiceInterface
             throw new Exception('Failed to send OTP email');
         }
     }
+    // admin 
+    public function adminRegister(array $data)
+{
+    return $this->auth_repository->adminRegister($data);
+}
+
 }

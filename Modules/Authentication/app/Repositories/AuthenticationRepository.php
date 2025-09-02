@@ -136,4 +136,31 @@ class AuthenticationRepository implements AuthenticationRepositoryInterface
             throw new Exception('Error during dashboard login: ' . $e->getMessage());
         }
     }
+    // admin 
+    public function adminRegister(array $data)
+{
+    try {
+        DB::beginTransaction();
+
+        $user = $this->users_repository->create($data);
+        $user->assignRole('admin'); // 🟢 الدور Admin
+        $user->load('roles');
+
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        // 🟢 إرسال event (لو عندك Welcome email أو إشعارات)
+        event(new NewUser($user));
+
+        DB::commit();
+
+        return [
+            'user'  => $user,
+            'token' => $token,
+        ];
+    } catch (Exception $e) {
+        DB::rollBack();
+        throw new Exception('Error during admin registration: ' . $e->getMessage());
+    }
+}
+
 }

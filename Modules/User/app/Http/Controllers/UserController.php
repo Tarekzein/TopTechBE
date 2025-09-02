@@ -125,4 +125,20 @@ class UserController extends Controller
             ], 500);
         }
     }
+    public function getWithRoles(Request $request)
+    {
+        try {
+            // دعم pagination لو عايز
+            $perPage = $request->get('per_page', 20);
+            $users = $this->user_service->getWithRoles($perPage);
+
+            return response()->json($users, 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'message' => 'Failed to fetch users',
+                'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+
 }

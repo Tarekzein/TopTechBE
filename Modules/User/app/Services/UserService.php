@@ -38,4 +38,9 @@ class UserService implements UserServiceInterface
     {
         return $this->user_repository->delete($id);
     }
+    public function getWithRoles()
+    {
+        return $this->user_repository->getWithRoles();
+    }
+
 }
