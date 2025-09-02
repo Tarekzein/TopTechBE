@@ -62,7 +62,74 @@ class WalletTransactionService
             return null;
         }
     }
-
+public function processRefundManually(Order $order, ?float $refundAmount = null, ?string $reason = null): ?WalletTransaction
+    {
+        try {
+            DB::beginTransaction();
+            
+            // If no refund amount specified, refund the full order amount
+            $refundAmount = $refundAmount ?? $order->total;
+            
+            // Validate refund amount
+            if ($refundAmount > $order->total) {
+                throw new \Exception('Refund amount cannot exceed order total');
+            }
+            
+            // Add refund to user's wallet
+            $description = "Refund for order #{$order->order_number}";
+            if ($reason) {
+                $description .= " - {$reason}";
+            }
+            
+            $metadata = [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'refund_reason' => $reason,
+                'original_amount' => $order->total,
+                'refund_amount' => $refundAmount,
+            ];
+            
+            $transaction = $this->addFunds($order->user, $refundAmount, $description, $metadata);
+            
+            if (!$transaction) {
+                DB::rollBack();
+                return null;
+            }
+            
+            // Update order status and metadata
+            $order->update([
+                'status' => 'refunded',
+                'refunded_at' => now(),
+                'meta_data' => array_merge($order->meta_data ?? [], [
+                    'refund_transaction_id' => $transaction->id,
+                    'refund_amount' => $refundAmount,
+                    'refund_reason' => $reason,
+                    'refund_processed' => true,
+                ])
+            ]);
+            
+            DB::commit();
+            
+            Log::info('Manual refund processed successfully', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'user_id' => $order->user_id,
+                'refund_amount' => $refundAmount,
+                'transaction_id' => $transaction->id
+            ]);
+            
+            return $transaction;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Failed to process manual refund', [
+                'order_id' => $order->id,
+                'order_number' => $order->order_number,
+                'refund_amount' => $refundAmount,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
     /**
      * Create a deposit transaction
      */

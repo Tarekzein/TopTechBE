@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Modules\Store\Services\WalletTransactionService;
 use Modules\Store\Services\WalletService;
 use Modules\Store\Models\Order;
+use Modules\Store\Models\WalletTransaction ;
 use Illuminate\Support\Facades\Auth;
 
 class WalletTransactionController extends Controller
@@ -123,46 +124,63 @@ class WalletTransactionController extends Controller
      * Update transaction status (admin only)
      */
     public function updateStatus(Request $request, int $transactionId): JsonResponse
-    {
-        try {
-            $request->validate([
-                'status' => 'required|in:pending,completed,failed,cancelled',
-                'reason' => 'nullable|string|max:255',
-            ]);
+{
+    try {
+        // 🔹 Validate input
+        $validator = \Validator::make($request->all(), [
+            'status' => 'required|string',
+            'reason' => 'nullable|string|max:255',
+        ]);
 
-            // Check if user is admin
-            if (!Auth::user()->hasRole(['admin', 'super-admin'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized to update transaction status'
-                ], 403);
-            }
-
-            $success = $this->transactionService->updateTransactionStatus(
-                $transactionId,
-                $request->status,
-                $request->reason
-            );
-
-            if (!$success) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to update transaction status'
-                ], 400);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Transaction status updated successfully'
-            ]);
-        } catch (\Exception $e) {
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update transaction status',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Validation error',
+                'errors' => $validator->errors(), // هنا يرجع كل الحقول اللي فشلت
+            ], 422);
         }
+
+        // 🔹 Check admin role
+        if (!Auth::user()->hasRole(['admin', 'super-admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: Only admin or super-admin can update transaction status'
+            ], 403);
+        }
+
+        // 🔹 Update transaction
+        $success = $this->transactionService->updateTransactionStatus(
+            $transactionId,
+            $request->status,
+            $request->reason
+        );
+
+        if (!$success) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transaction update failed: Invalid transaction ID or status'
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaction status updated successfully'
+        ]);
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Transaction not found',
+            'error' => $e->getMessage()
+        ], 404);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unexpected error while updating transaction status',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
 
     /**
      * Get refund history for user
@@ -224,4 +242,160 @@ class WalletTransactionController extends Controller
             ], 500);
         }
     }
+     public function getAllTransactions(Request $request)
+    {
+        $filters = $request->only(['user_id','type','status','date_from','date_to','min_amount','max_amount','page','per_page']);
+        $transactions = WalletTransaction::query();
+
+        if ($filters['user_id'] ?? false) {
+            $transactions->where('user_id', $filters['user_id']);
+        }
+        if ($filters['type'] ?? false) {
+            $transactions->where('type', $filters['type']);
+        }
+        if ($filters['status'] ?? false) {
+            $transactions->where('status', $filters['status']);
+        }
+        if ($filters['date_from'] ?? false) {
+            $transactions->whereDate('created_at', '>=', $filters['date_from']);
+        }
+        if ($filters['date_to'] ?? false) {
+            $transactions->whereDate('created_at', '<=', $filters['date_to']);
+        }
+        if ($filters['min_amount'] ?? false) {
+            $transactions->where('amount', '>=', $filters['min_amount']);
+        }
+        if ($filters['max_amount'] ?? false) {
+            $transactions->where('amount', '<=', $filters['max_amount']);
+        }
+
+        $perPage = $filters['per_page'] ?? 20;
+        $data = $transactions->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+    }
+
+    // 🟢 Get all refund requests
+    public function getAllRefunds(Request $request)
+    {
+        $filters = $request;
+        $refunds = Order::where('status', 'refunded');
+
+        
+
+        $perPage = $filters['per_page'] ?? 20;
+        $data = $refunds->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+    }
+
+    // 🟢 Update transaction details (admin override)
+    public function updateTransaction(Request $request, WalletTransaction $transaction)
+    {
+        $request->validate([
+            'amount' => 'nullable|numeric|min:0',
+            'status' => 'nullable|string',
+            'metadata' => 'nullable|array',
+        ]);
+
+        $transaction->update($request->only(['amount', 'status', 'metadata']));
+
+        return response()->json([
+            'success' => true,
+            'data' => $transaction
+        ]);
+    }
+
+    // 🟢 Admin analytics / summary
+    public function getAdminAnalytics()
+{
+    try {
+        if (!Auth::user()->hasRole(['admin', 'super-admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: Only admin can view analytics'
+            ], 403);
+        }
+
+        // Join wallets to get currency and group by currency + type
+        $analytics = \Modules\Store\Models\WalletTransaction::query()
+            ->selectRaw('wallets.currency, wallet_transactions.type, SUM(wallet_transactions.amount) as total_amount')
+            ->join('wallets', 'wallet_transactions.wallet_id', '=', 'wallets.id')
+            ->groupBy('wallets.currency', 'wallet_transactions.type')
+            ->get();
+
+        // Restructure result to be grouped per currency
+        $result = [];
+        foreach ($analytics as $row) {
+            $currency = $row->currency;
+            if (!isset($result[$currency])) {
+                $result[$currency] = [
+                    'currency' => $currency,
+                    'total_added' => 0,
+                    'total_withdrawn' => 0,
+                    'total_refunded' => 0,
+                ];
+            }
+
+            if ($row->type === 'deposit') {
+                $result[$currency]['total_added'] = $row->total_amount;
+            } elseif ($row->type === 'withdrawal') {
+                $result[$currency]['total_withdrawn'] = $row->total_amount;
+            } elseif ($row->type === 'refund') {
+                $result[$currency]['total_refunded'] = $row->total_amount;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => array_values($result)
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to get analytics',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+    /**
+ * 🟢 Get all refund history (admin only)
+ */
+public function getAllRefundHistory(Request $request): JsonResponse
+{
+    try {
+        if (!Auth::user()->hasRole(['admin', 'super-admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: Only admin can view refund history'
+            ], 403);
+        }
+
+        $perPage = $request->get('per_page', 20);
+
+        $refunds = WalletTransaction::with(['wallet.user'])
+            ->where('type', 'refund')
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => $refunds
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to get refund history',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
 }

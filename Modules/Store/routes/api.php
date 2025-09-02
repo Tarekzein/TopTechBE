@@ -248,20 +248,30 @@ Route::prefix('store')->group(function () {
         // Admin routes
         Route::middleware(['role:admin|super-admin'])->group(function () {
             Route::post('/add-funds', [WalletController::class, 'addFunds']);
+            Route::get('/all', [WalletController::class, 'getAllWallets']);
+            Route::get('/total-balance', [WalletController::class, 'getTotalSystemBalance']);
+            Route::post('admin/withdraw', [WalletController::class, 'withdrawFundsAdmin']);
+
         });
     });
 
     // Wallet Transaction Routes
     Route::middleware(['auth:sanctum'])->prefix('wallet-transactions')->group(function () {
+        // Admin routes
+        Route::middleware(['role:admin|super-admin'])->prefix('admin')->group(function () {
+            Route::get('/refunds-history', [WalletTransactionController::class, 'getAllRefundHistory']);
+            Route::get('/', [WalletTransactionController::class, 'getAllTransactions']);
+            Route::get('/refunds', [WalletTransactionController::class, 'getAllRefunds']);
+            Route::get('/analytics', [WalletTransactionController::class, 'getAdminAnalytics']);
+            Route::put('/{transactionId}/status', [WalletTransactionController::class, 'updateStatus']);
+            
+        });
         Route::post('/refund', [WalletTransactionController::class, 'processRefund']);
         Route::get('/statistics', [WalletTransactionController::class, 'getStatistics']);
         Route::get('/refund-history', [WalletTransactionController::class, 'getRefundHistory']);
         Route::get('/{transactionId}', [WalletTransactionController::class, 'getTransaction']);
 
-        // Admin routes
-        Route::middleware(['role:admin|super-admin'])->group(function () {
-            Route::put('/{transactionId}/status', [WalletTransactionController::class, 'updateStatus']);
-        });
+        
     });
 
     // Banner Routes
