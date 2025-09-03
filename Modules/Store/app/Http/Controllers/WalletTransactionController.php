@@ -397,5 +397,70 @@ public function getAllRefundHistory(Request $request): JsonResponse
         ], 500);
     }
 }
+/**
+ * Get transactions by wallet ID
+ */
+public function getTransactionsByWallet(Request $request, int $walletId): JsonResponse
+{
+    try {
+        $user = Auth::user();
+
+        // Get wallet with user relation
+        $wallet = \Modules\Store\Models\Wallet::with('user')->findOrFail($walletId);
+
+        if ($wallet->user_id !== $user->id && !$user->hasRole(['admin', 'super-admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to view transactions for this wallet'
+            ], 403);
+        }
+
+        $filters = $request->only(['type', 'status', 'date_from', 'date_to', 'min_amount', 'max_amount']);
+        $perPage = $request->get('per_page', 20);
+
+        $transactions = WalletTransaction::where('wallet_id', $walletId);
+
+        // Apply filters
+        if ($filters['type'] ?? false) {
+            $transactions->where('type', $filters['type']);
+        }
+        if ($filters['status'] ?? false) {
+            $transactions->where('status', $filters['status']);
+        }
+        if ($filters['date_from'] ?? false) {
+            $transactions->whereDate('created_at', '>=', $filters['date_from']);
+        }
+        if ($filters['date_to'] ?? false) {
+            $transactions->whereDate('created_at', '<=', $filters['date_to']);
+        }
+        if ($filters['min_amount'] ?? false) {
+            $transactions->where('amount', '>=', $filters['min_amount']);
+        }
+        if ($filters['max_amount'] ?? false) {
+            $transactions->where('amount', '<=', $filters['max_amount']);
+        }
+
+        $data = $transactions->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'wallet' => $wallet,   // ✅ include wallet with user
+            'user'   => $wallet->user, // ✅ explicitly return wallet owner
+            'transactions' => $data,
+        ]);
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Wallet not found'
+        ], 404);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to get wallet transactions',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 
 }
