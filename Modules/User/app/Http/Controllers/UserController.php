@@ -74,38 +74,49 @@ class UserController extends Controller
     }
 
     public function update(Request $request, $id)
-    {
-        try {
-            $data = $request->validate([
-                'name' => 'sometimes|string|max:255',
-                'email' => 'sometimes|email|unique:users,email,' . $id,
-                'password' => 'nullable|min:6',
-            ]);
+{
+    try {
+        $data = $request->validate([
+            'first_name' => 'sometimes|string|max:255',
+            'last_name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $id,
+            'password' => 'nullable|confirmed|min:6', // ✅ confirm with password_confirmation
+        ]);
 
-            if (!empty($data['password'])) {
-                $data['password'] = bcrypt($data['password']);
-            } else {
-                unset($data['password']);
-            }
+        // Merge first + last name into a single "name" column if your DB uses "name"
+        // if (isset($data['first_name']) || isset($data['last_name'])) {
+        //     $data['name'] = trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
+        // }
 
-            $user = $this->user_service->update($id, $data);
-            return response()->json($user, 200);
-        } catch (ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'User not found'
-            ], 404);
-        } catch (Exception $e) {
-            return response()->json([
-                'message' => 'Failed to update user',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!empty($data['password'])) {
+            $data['password'] = bcrypt($data['password']);
+        } else {
+            unset($data['password']);
         }
+
+        // Remove extra keys not in the DB table
+        unset( $data['password_confirmation']);
+
+        $user = $this->user_service->update($id, $data);
+
+        return response()->json($user, 200);
+    } catch (ValidationException $e) {
+        return response()->json([
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
+    } catch (ModelNotFoundException $e) {
+        return response()->json([
+            'message' => 'User not found'
+        ], 404);
+    } catch (Exception $e) {
+        return response()->json([
+            'message' => 'Failed to update user',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
 
     public function destroy($id)
     {
