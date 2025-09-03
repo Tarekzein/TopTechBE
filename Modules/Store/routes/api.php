@@ -256,23 +256,26 @@ Route::prefix('store')->group(function () {
     });
 
     // Wallet Transaction Routes
-    Route::middleware(['auth:sanctum'])->prefix('wallet-transactions')->group(function () {
-        // Admin routes
-        Route::middleware(['role:admin|super-admin'])->prefix('admin')->group(function () {
-            Route::get('/refunds-history', [WalletTransactionController::class, 'getAllRefundHistory']);
-            Route::get('/', [WalletTransactionController::class, 'getAllTransactions']);
-            Route::get('/refunds', [WalletTransactionController::class, 'getAllRefunds']);
-            Route::get('/analytics', [WalletTransactionController::class, 'getAdminAnalytics']);
-            Route::put('/{transactionId}/status', [WalletTransactionController::class, 'updateStatus']);
-            
-        });
-        Route::post('/refund', [WalletTransactionController::class, 'processRefund']);
-        Route::get('/statistics', [WalletTransactionController::class, 'getStatistics']);
-        Route::get('/refund-history', [WalletTransactionController::class, 'getRefundHistory']);
-        Route::get('/{transactionId}', [WalletTransactionController::class, 'getTransaction']);
-
-        
+   Route::middleware(['auth:sanctum'])->prefix('wallet-transactions')->group(function () {
+    // Admin routes
+    Route::middleware(['role:admin|super-admin'])->prefix('admin')->group(function () {
+        Route::get('/refunds-history', [WalletTransactionController::class, 'getAllRefundHistory']);
+        Route::get('/', [WalletTransactionController::class, 'getAllTransactions']);
+        Route::get('/refunds', [WalletTransactionController::class, 'getAllRefunds']);
+        Route::get('/analytics', [WalletTransactionController::class, 'getAdminAnalytics']);
+        Route::put('/{transactionId}/status', [WalletTransactionController::class, 'updateStatus']);
     });
+    
+    Route::post('/refund', [WalletTransactionController::class, 'processRefund']);
+    Route::get('/statistics', [WalletTransactionController::class, 'getStatistics']);
+    Route::get('/refund-history', [WalletTransactionController::class, 'getRefundHistory']);
+    
+   
+    Route::get('/{walletId}/transactions', [WalletTransactionController::class, 'getTransactionsByWallet']);
+    
+   
+    Route::get('/{transactionId}', [WalletTransactionController::class, 'getTransaction']);
+});
 
     // Banner Routes
     Route::prefix('banners')->group(function () {
