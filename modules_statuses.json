@@ -4,5 +4,6 @@
     "User": true,
     "Store": true,
     "Blog": true,
-    "Common": true
+    "Common": true,
+    "Chat": true
 }
