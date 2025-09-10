@@ -12,7 +12,7 @@ use Spatie\Permission\Traits\HasRoles;
 use Modules\Vendor\Models\Vendor;
 use Modules\Store\Models\Order;
 use Modules\Store\Models\Wallet;
-
+use Modules\User\Models\FcmToken;
 class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable, Sluggable, HasRoles, HasApiTokens;
@@ -82,8 +82,10 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Route notifications for the database channel.
      */
-    public function routeNotificationForDatabase()
-    {
-        return $this->id;
-    }
+    
+    public function fcmTokens()
+{
+    return $this->hasMany(FcmToken::class);
+}
+
 }
