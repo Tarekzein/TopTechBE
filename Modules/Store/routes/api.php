@@ -28,6 +28,12 @@ Route::prefix('store')->group(function () {
     // Currency Routes
     Route::prefix('currencies')->group(function () {
         Route::get('/', [CurrencyController::class, 'index']);
+        Route::post('/', [CurrencyController::class, 'store']);
+        Route::get('{id}', [CurrencyController::class, 'show']);
+        Route::put('{id}', [CurrencyController::class, 'update']);
+        Route::delete('{id}', [CurrencyController::class, 'destroy']);
+        Route::patch('{id}/toggle-active', [CurrencyController::class, 'toggleActive']);
+        Route::patch('{id}/set-default', [CurrencyController::class, 'setDefault']);
     });
 
     // Category Routes
