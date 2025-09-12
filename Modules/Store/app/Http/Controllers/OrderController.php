@@ -15,7 +15,7 @@ use Modules\Store\Models\ShippingAddress;
 use Illuminate\Support\Facades\Log;
 use Modules\Store\Events\OrderCreated;
 use Modules\Store\Events\OrderStatusUpdated;
-
+use Modules\Store\Events\PaymentStatusUpdated;
 class OrderController extends Controller
 {
     protected $orderService;
@@ -237,29 +237,40 @@ class OrderController extends Controller
      * @return JsonResponse
      */
     public function updatePaymentStatus(Request $request, string $orderNumber): JsonResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'status' => 'required|string|in:pending,paid,failed,refunded',
-            'payment_id' => 'nullable|string',
-        ]);
+{
+    $validator = Validator::make($request->all(), [
+        'status' => 'required|string|in:pending,paid,failed,refunded',
+        'payment_id' => 'nullable|string',
+    ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422);
-        }
-
-        $order = Order::where('order_number', $orderNumber)->first();
-
-        if (!$order) {
-            return response()->json(['message' => 'Order not found'], 404);
-        }
-
-        try {
-            $order = $this->orderService->updatePaymentStatus($order, $request->status, $request->payment_id);
-            return response()->json($order);
-        } catch (\Exception $e) {
-            return response()->json(['message' => 'Failed to update payment status: ' . $e->getMessage()], 500);
-        }
+    if ($validator->fails()) {
+        return response()->json(['errors' => $validator->errors()], 422);
     }
+
+    $order = Order::where('order_number', $orderNumber)->first();
+
+    if (!$order) {
+        return response()->json(['message' => 'Order not found'], 404);
+    }
+
+    try {
+        $oldStatus = $order->payment_status;
+        $order = $this->orderService->updatePaymentStatus($order, $request->status, $request->payment_id);
+
+        if ($oldStatus !== $order->payment_status) {
+            \Log::info("🚀 Dispatching PaymentStatusUpdated event", [
+    'order' => $order->id,
+    'old'   => $oldStatus,
+    'new'   => $order->payment_status,
+]);
+            event(new PaymentStatusUpdated($order, $oldStatus, $order->payment_status));
+        }
+
+        return response()->json($order);
+    } catch (\Exception $e) {
+        return response()->json(['message' => 'Failed to update payment status: ' . $e->getMessage()], 500);
+    }
+}
 
     /**
      * Update shipping information (admin only).

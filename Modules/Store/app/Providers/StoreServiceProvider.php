@@ -52,6 +52,7 @@ class StoreServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Log::info('EventServiceProvider booted and listeners should register');
         $this->registerTranslations();
         $this->registerConfig();
         $this->registerViews();
@@ -78,7 +79,8 @@ class StoreServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->register(EventServiceProvider::class);
+        \Log::info('StoreServiceProvider registered');
+        $this->app->register(\Modules\Store\Providers\EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
         $this->app->register(AnalyticsServiceProvider::class);
         $this->registerCommands();

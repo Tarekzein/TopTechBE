@@ -3,17 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Common\Http\Controllers\CommonController;
 
-/*
- *--------------------------------------------------------------------------
- * API Routes
- *--------------------------------------------------------------------------
- *
- * Here is where you can register API routes for your application. These
- * routes are loaded by the RouteServiceProvider within a group which
- * is assigned the "api" middleware group. Enjoy building your API!
- *
-*/
+use Modules\Common\Http\Controllers\NotificationController;
 
-Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
-    Route::apiResource('common', CommonController::class)->names('common');
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications', [NotificationController::class, 'store']);
+    Route::patch('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
 });
