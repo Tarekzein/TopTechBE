@@ -214,6 +214,7 @@ Route::get('settings/test', [SettingController::class, 'test']);
     // Admin Analytics Routes
     Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->prefix('admin/analytics')->group(function () {
         Route::get('/vendors', [AnalyticsController::class, 'getAllVendorsAnalytics']);
+        Route::get('/summary', [AnalyticsController::class, 'getSummary']);
         Route::get('/vendors/{vendorId}', [AnalyticsController::class, 'getVendorAnalytics']);
     });
 
