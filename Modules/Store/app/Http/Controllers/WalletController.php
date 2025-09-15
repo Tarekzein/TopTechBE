@@ -285,21 +285,31 @@ public function getAllWallets(Request $request): JsonResponse
             ], 403);
         }
 
+        $perPage = (int) $request->get('per_page', 20);
+        $search  = $request->get('search') ?? $request->get('email');
+
         $wallets = \Modules\Store\Models\Wallet::with('user')
-            ->paginate($request->get('per_page', 20));
+            ->when($search, function ($query, $search) {
+                $query->whereHas('user', function ($q) use ($search) {
+                    $q->where('email', 'like', "%{$search}%");
+                });
+            })
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $wallets
+            'data'    => $wallets
         ]);
     } catch (\Exception $e) {
         return response()->json([
             'success' => false,
             'message' => 'Failed to get wallets',
-            'error' => $e->getMessage()
+            'error'   => $e->getMessage()
         ], 500);
     }
 }
+
+
 
 /**
  * 🟢 Get total balance of all wallets
