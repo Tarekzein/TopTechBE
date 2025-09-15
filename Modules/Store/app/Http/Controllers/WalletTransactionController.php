@@ -244,12 +244,13 @@ class WalletTransactionController extends Controller
     }
      public function getAllTransactions(Request $request)
     {
-        $filters = $request->only(['user_id','type','status','date_from','date_to','min_amount','max_amount','page','per_page']);
+        $filters = $request->only(['description','type','status','date_from','date_to','min_amount','max_amount','page','per_page']);
         $transactions = WalletTransaction::query();
 
-        if ($filters['user_id'] ?? false) {
-            $transactions->where('user_id', $filters['user_id']);
+        if (!empty($filters['description'])) {
+            $transactions->where('description', 'like', '%' . $filters['description'] . '%');
         }
+
         if ($filters['type'] ?? false) {
             $transactions->where('type', $filters['type']);
         }
@@ -269,7 +270,7 @@ class WalletTransactionController extends Controller
             $transactions->where('amount', '<=', $filters['max_amount']);
         }
 
-        $perPage = $filters['per_page'] ?? 20;
+        $perPage = $filters['per_page'] ?? 10;
         $data = $transactions->paginate($perPage);
 
         return response()->json([

@@ -239,30 +239,39 @@ class WalletController extends Controller
      * Get transaction details
      */
     public function getTransactionDetails(int $transactionId): JsonResponse
-    {
-        try {
-            $user = Auth::user();
-            $transaction = $this->walletRepository->getTransactionWithDetails($transactionId);
+{
+    try {
+        $user = Auth::user();
+        $transaction = $this->walletRepository->getTransactionWithDetails($transactionId);
 
-            if (!$transaction || $transaction->wallet->user_id !== $user->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Transaction not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $transaction
-            ]);
-        } catch (\Exception $e) {
+        if (!$transaction) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to get transaction details',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Transaction not found'
+            ], 404);
         }
+
+        // ✅ check ownership unless user is admin or super-admin
+        if (!Auth::user()->hasRole(['admin', 'super-admin']) && $transaction->wallet->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorized to view this transaction'
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $transaction
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to get transaction details',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
     /**
  * 🟢 Get all wallets (admin only)
  */
