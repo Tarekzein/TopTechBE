@@ -18,17 +18,20 @@ class CustomerRepository
      */
     public function getAllCustomers(array $filters = []): LengthAwarePaginator
     {
-        $query = User::whereHas('orders')
-            ->with(['orders' => function ($query) {
-                $query->latest()->take(5);
-            }])
-            ->withCount([
-                'orders',
-                'orders as completed_orders_count' => function ($query) {
-                    $query->where('status', 'delivered');
-                }
-            ])
-            ->withSum('orders', 'total');
+        $query = User::whereHas('roles', function ($q) {
+        $q->where('name', 'customer');
+    })
+    ->with(['orders' => function ($query) {
+        $query->latest()->take(5);
+    }])
+    ->withCount([
+        'orders',
+        'orders as completed_orders_count' => function ($query) {
+            $query->where('status', 'delivered');
+        }
+    ])
+    ->withSum('orders', 'total');
+
 
         $this->applyFilters($query, $filters);
 

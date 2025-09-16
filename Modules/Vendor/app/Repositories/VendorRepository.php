@@ -19,13 +19,10 @@ class VendorRepository implements VendorRepositoryInterface
     }
 
     public function findById($id)
-    {
-        try {
-            return Vendor::findOrFail($id);
-        } catch (Exception $e) {
-            throw new Exception('Error finding vendor: ' . $e->getMessage());
-        }
-    }
+{
+    return Vendor::findOrFail($id);
+}
+
 
     public function create(array $data)
     {

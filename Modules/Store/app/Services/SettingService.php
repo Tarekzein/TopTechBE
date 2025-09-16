@@ -355,6 +355,112 @@ class SettingService implements SettingServiceInterface
     {
         return self::TYPES;
     }
+    public function bulkUpdate(array $settings): array
+{
+    $errors = [];
+    $updated = [];
+
+    Log::info('=== SERVICE BULK UPDATE START ===');
+    Log::info('SettingService->bulkUpdate called with:', ['settings_count' => count($settings)]);
+    Log::info('Repository class:', [get_class($this->settingRepository)]);
+
+    // Check if repository is properly injected
+    if (!$this->settingRepository) {
+        Log::error('SettingRepository not injected properly');
+        throw new \Exception('Repository not available');
+    }
+
+    foreach ($settings as $index => $setting) {
+        Log::info("=== Processing setting #{$index} ===");
+        Log::info('Setting data:', $setting);
+
+        $key = $setting['key'] ?? null;
+        $value = $setting['value'] ?? null;
+
+        if (!$key) {
+            $error = ['key' => null, 'error' => 'Key is required'];
+            Log::warning('Setting missing key:', $error);
+            $errors[] = $error;
+            continue;
+        }
+
+        Log::info("Looking for setting with key: {$key}");
+
+        try {
+            // Check if findByKey method exists
+            if (!method_exists($this->settingRepository, 'findByKey')) {
+                Log::error('findByKey method does not exist on repository');
+                throw new \Exception('Repository method findByKey not found');
+            }
+
+            $model = $this->settingRepository->findByKey($key);
+            Log::info('Repository findByKey result:', [
+                'found' => $model ? 'yes' : 'no',
+                'model_class' => $model ? get_class($model) : null,
+                'model_data' => $model ? $model->toArray() : null
+            ]);
+
+            if (!$model) {
+                $error = ['key' => $key, 'error' => 'Setting not found'];
+                Log::warning('Setting not found:', $error);
+                $errors[] = $error;
+                continue;
+            }
+
+            Log::info("Attempting to update setting {$key} with value:", ['value' => $value, 'type' => gettype($value)]);
+
+            // Check if setValue method exists
+            if (!method_exists($this->settingRepository, 'setValue')) {
+                Log::error('setValue method does not exist on repository');
+                throw new \Exception('Repository method setValue not found');
+            }
+
+            $success = $this->settingRepository->setValue($key, $value);
+            Log::info("setValue returned:", ['success' => $success, 'type' => gettype($success)]);
+
+            if ($success) {
+                $updatedItem = [
+                    'key' => $key,
+                    'value' => $value,
+                    'updated_at' => now()
+                ];
+                $updated[] = $updatedItem;
+                Log::info('Setting updated successfully:', $updatedItem);
+            } else {
+                $error = ['key' => $key, 'error' => 'setValue returned false - update failed'];
+                Log::error('setValue returned false:', $error);
+                $errors[] = $error;
+            }
+
+        } catch (\Throwable $e) {
+            Log::error("=== Exception updating setting {$key} ===");
+            Log::error('Exception class: ' . get_class($e));
+            Log::error('Exception message: ' . $e->getMessage());
+            Log::error('Exception file: ' . $e->getFile() . ':' . $e->getLine());
+            Log::error('Exception trace: ' . $e->getTraceAsString());
+
+            $error = ['key' => $key, 'error' => $e->getMessage()];
+            $errors[] = $error;
+        }
+    }
+
+    $result = [
+        'updated' => $updated,
+        'errors' => $errors,
+    ];
+
+    Log::info('=== SERVICE BULK UPDATE RESULT ===');
+    Log::info('Final result:', [
+        'updated_count' => count($updated),
+        'errors_count' => count($errors),
+        'updated' => $updated,
+        'errors' => $errors
+    ]);
+    Log::info('=== SERVICE BULK UPDATE END ===');
+
+    return $result;
+}
+
 
     /**
      * Get all settings grouped by their group key.

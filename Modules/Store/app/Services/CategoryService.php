@@ -5,14 +5,17 @@ namespace Modules\Store\Services;
 use Exception;
 use Illuminate\Support\Facades\Validator;
 use Modules\Store\Repositories\CategoryRepository;
+use Modules\Common\Services\CloudImageService;
 
 class CategoryService
 {
     protected $categoryRepository;
+    protected $cloudImageService;
 
-    public function __construct(CategoryRepository $categoryRepository)
+    public function __construct(CategoryRepository $categoryRepository, CloudImageService $cloudImageService)
     {
         $this->categoryRepository = $categoryRepository;
+        $this->cloudImageService = $cloudImageService;
     }
 
     /**
@@ -23,14 +26,10 @@ class CategoryService
         $rules = [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'image' => 'nullable|string|max:255',
+            'image' => 'nullable', // هنرفعها مش هنخليها string
             'is_active' => 'boolean',
             'parent_id' => 'nullable|exists:categories,id'
         ];
-
-        if ($id) {
-            $rules['parent_id'] .= ',id,' . $id;
-        }
 
         $validator = Validator::make($data, $rules);
 
@@ -63,6 +62,15 @@ class CategoryService
     public function createCategory(array $data)
     {
         $validatedData = $this->validate($data);
+
+        // ✅ رفع الصورة لو موجودة
+        if (isset($data['image']) && $data['image'] instanceof \Illuminate\Http\UploadedFile) {
+            $uploadResult = $this->cloudImageService->upload($data['image']->getRealPath(), [
+                'folder' => 'categories'
+            ]);
+            $validatedData['image'] = $uploadResult['secure_url'] ?? null;
+        }
+
         return $this->categoryRepository->create($validatedData);
     }
 
@@ -72,6 +80,15 @@ class CategoryService
     public function updateCategory(int $id, array $data)
     {
         $validatedData = $this->validate($data, $id);
+
+        // ✅ لو فيه صورة جديدة ارفعها
+        if (isset($data['image']) && $data['image'] instanceof \Illuminate\Http\UploadedFile) {
+            $uploadResult = $this->cloudImageService->upload($data['image']->getRealPath(), [
+                'folder' => 'categories'
+            ]);
+            $validatedData['image'] = $uploadResult['secure_url'] ?? null;
+        }
+
         return $this->categoryRepository->update($id, $validatedData);
     }
 
@@ -98,4 +115,4 @@ class CategoryService
     {
         return $this->categoryRepository->findBySlug($slug);
     }
-} 
+}

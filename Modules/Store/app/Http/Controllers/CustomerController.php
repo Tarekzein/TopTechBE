@@ -7,7 +7,7 @@ use Modules\Store\Services\CustomerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
-
+use App\Models\User;
 class CustomerController extends Controller
 {
     protected $customerService;
@@ -85,6 +85,140 @@ class CustomerController extends Controller
             ], $e->getMessage() === 'Unauthorized: Admin access required.' ? 403 : 500);
         }
     }
+ public function store(Request $request)
+{
+    try {
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:255',
+            'last_name'  => 'required|string|max:255',
+            'email'      => 'required|email|unique:users,email',
+            'phone'      => 'nullable|string|max:20',
+            'address'    => 'nullable|string|max:500',
+            'password'   => 'required|string|min:6',
+        ]);
+
+        // إنشاء عميل جديد
+        $customer = new User();
+        $customer->fill($validated);
+        $customer->password = bcrypt($validated['password']);
+        $customer->save();
+
+        // إسناد role باسم "customer"
+        $customer->assignRole('customer');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Customer created successfully',
+            'data'    => [
+                'id'         => $customer->id,
+                'first_name' => $customer->first_name,
+                'last_name'  => $customer->last_name,
+                'slug'       => $customer->slug ?? null,
+                'email'      => $customer->email,
+                'phone'      => $customer->phone ?? null,
+                'address'    => $customer->address ?? null,
+                'roles'      => $customer->getRoleNames(), // ترجع ["customer"]
+                'created_at' => $customer->created_at,
+            ]
+        ], 201);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation error',
+            'errors'  => $e->errors(),
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to create customer',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
+public function destroy($id)
+{
+    try {
+        $customer = User::findOrFail($id);
+
+        if (!$customer->hasRole('customer')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The user is not a customer.',
+            ], 403);
+        }
+
+        // soft delete
+        $customer->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Customer soft deleted successfully.',
+        ], 200);
+
+    } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Customer not found.',
+        ], 404);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to delete customer.',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
+
+public function update(Request $request, $id)
+{
+    try {
+        // جِب العميل (User)
+        $customer = User::findOrFail($id);
+
+        // Validate input
+        $validated = $request->validate([
+            'first_name' => 'sometimes|string|max:255',
+            'last_name'  => 'sometimes|string|max:255',
+            'email'      => 'sometimes|email|unique:users,email,' . $id,
+            'phone'      => 'nullable|string|max:20',
+            'address'    => 'nullable|string|max:500',
+        ]);
+
+        // Update customer
+        $customer->fill($validated);
+        $customer->save();
+
+        // Response structure
+        return response()->json([
+            'success' => true,
+            'message' => 'Customer updated successfully',
+            'data'    => [
+                'id'         => $customer->id,
+                'first_name' => $customer->first_name,
+                'last_name'  => $customer->last_name,
+                'slug'       => $customer->slug ?? null,
+                'email'      => $customer->email,
+                'phone'      => $customer->phone ?? null,
+                'address'    => $customer->address ?? null,
+                'created_at' => $customer->created_at,
+                'updated_at' => $customer->updated_at,
+            ]
+        ], 200);
+    } catch (\Illuminate\Validation\ValidationException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation error',
+            'errors'  => $e->errors(),
+        ], 422);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to update customer',
+            'error'   => $e->getMessage(),
+        ], 500);
+    }
+}
 
     /**
      * Get customers for authenticated vendor.

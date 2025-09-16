@@ -239,30 +239,39 @@ class WalletController extends Controller
      * Get transaction details
      */
     public function getTransactionDetails(int $transactionId): JsonResponse
-    {
-        try {
-            $user = Auth::user();
-            $transaction = $this->walletRepository->getTransactionWithDetails($transactionId);
+{
+    try {
+        $user = Auth::user();
+        $transaction = $this->walletRepository->getTransactionWithDetails($transactionId);
 
-            if (!$transaction || $transaction->wallet->user_id !== $user->id) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Transaction not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $transaction
-            ]);
-        } catch (\Exception $e) {
+        if (!$transaction) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to get transaction details',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Transaction not found'
+            ], 404);
         }
+
+        // ✅ check ownership unless user is admin or super-admin
+        if (!Auth::user()->hasRole(['admin', 'super-admin']) && $transaction->wallet->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You are not authorized to view this transaction'
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $transaction
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to get transaction details',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
     /**
  * 🟢 Get all wallets (admin only)
  */
@@ -276,21 +285,31 @@ public function getAllWallets(Request $request): JsonResponse
             ], 403);
         }
 
+        $perPage = (int) $request->get('per_page', 20);
+        $search  = $request->get('search') ?? $request->get('email');
+
         $wallets = \Modules\Store\Models\Wallet::with('user')
-            ->paginate($request->get('per_page', 20));
+            ->when($search, function ($query, $search) {
+                $query->whereHas('user', function ($q) use ($search) {
+                    $q->where('email', 'like', "%{$search}%");
+                });
+            })
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data' => $wallets
+            'data'    => $wallets
         ]);
     } catch (\Exception $e) {
         return response()->json([
             'success' => false,
             'message' => 'Failed to get wallets',
-            'error' => $e->getMessage()
+            'error'   => $e->getMessage()
         ], 500);
     }
 }
+
+
 
 /**
  * 🟢 Get total balance of all wallets

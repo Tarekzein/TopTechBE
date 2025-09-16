@@ -81,9 +81,11 @@ class SettingRepository implements SettingRepositoryInterface
      * @return Setting|null
      */
     public function findByKey(string $key): ?Setting
-    {
-        return $this->model->where('key', $key)->first();
-    }
+{
+    \Log::info("🔑 Searching for setting with key: {$key}");
+    return Setting::where('key', $key)->first();
+}
+
 
     /**
      * Get a setting value

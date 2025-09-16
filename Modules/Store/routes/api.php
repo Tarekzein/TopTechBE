@@ -163,16 +163,21 @@ Route::prefix('store')->group(function () {
 
     });
 
-    Route::group(["prefix"=>"settings"],function () {
-        // Settings routes
-        Route::get('/', [SettingController::class, 'index']);
-        Route::get('/groups', [SettingController::class, 'getGroups']);
-        Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
-            Route::get('/{key}', [SettingController::class, 'show']);
-            Route::put('/{key}', [SettingController::class, 'update']);
-            Route::put('/bulk-update', [SettingController::class, 'bulkUpdate']);
-        });
+    Route::group(['prefix' => 'settings'], function () {
+    // Public Settings routes
+    Route::get('/', [SettingController::class, 'index']); // Get all settings
+    Route::get('/groups', [SettingController::class, 'getGroups']); // Get groups of settings
+Route::get('settings/test', [SettingController::class, 'test']);
+    // Protected (admin/super-admin only)
+    Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->group(function () {
+        Route::put('/bulk-update', [SettingController::class, 'bulkUpdate'])->name('settings.bulk-update');
+        Route::get('/{key}', [SettingController::class, 'show']); // Get single setting by key
+        Route::put('/{key}', [SettingController::class, 'update']); // Update single setting
+        Route::delete('/{key}', [SettingController::class, 'destroy']); // Delete single setting
+         // Bulk update settings
+        Route::post('/', [SettingController::class, 'store']); // Add new setting (missing in your code)
     });
+});
 
     // Payment Routes
     Route::prefix('payments')->group(function () {
@@ -209,6 +214,7 @@ Route::prefix('store')->group(function () {
     // Admin Analytics Routes
     Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->prefix('admin/analytics')->group(function () {
         Route::get('/vendors', [AnalyticsController::class, 'getAllVendorsAnalytics']);
+        Route::get('/summary', [AnalyticsController::class, 'getSummary']);
         Route::get('/vendors/{vendorId}', [AnalyticsController::class, 'getVendorAnalytics']);
     });
 
@@ -219,7 +225,15 @@ Route::prefix('store')->group(function () {
             Route::get('/', [CustomerController::class, 'index']);
             Route::get('/analytics/summary', [CustomerController::class, 'analytics']);
             Route::get('/data/export', [CustomerController::class, 'export']);
-            
+            Route::post('/', [CustomerController::class, 'store']);
+            Route::put('/{id}', [CustomerController::class, 'update']);
+            Route::delete('/{id}', [CustomerController::class, 'destroy']);
+            Route::patch('/{id}/status', [CustomerController::class, 'updateStatus']);
+            Route::post('/bulk-delete', [CustomerController::class, 'bulkDelete']);
+            Route::post('/bulk-update-status', [CustomerController::class, 'bulkUpdateStatus']);
+            Route::post('/{id}/message', [CustomerController::class, 'sendMessage']);
+            Route::get('/{id}/orders', [CustomerController::class, 'getCustomerOrders']);
+            Route::post('/import', [CustomerController::class, 'import']);
             // Admin routes for specific vendor's customers
             Route::get('/vendors/{vendorId}', [CustomerController::class, 'adminVendorIndex']);
             Route::get('/vendors/{vendorId}/analytics', [CustomerController::class, 'adminVendorAnalytics']);
