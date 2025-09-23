@@ -11,7 +11,11 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        \Modules\Chat\Events\MessageSent::class => [
+            \Modules\Chat\Listeners\SendChatNotifications::class,
+        ],
+    ];
 
     /**
      * Indicates if events should be discovered.

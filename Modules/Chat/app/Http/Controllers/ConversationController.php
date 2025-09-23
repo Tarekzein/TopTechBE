@@ -2,61 +2,69 @@
 
 namespace Modules\Chat\Http\Controllers;
 
-
 use App\Http\Controllers\Controller;
 use Modules\Chat\Models\Conversation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Modules\Chat\Services\Contracts\ConversationServiceInterface;
+use Modules\Chat\Http\Requests\OpenOrCreateConversationRequest;
+
 class ConversationController extends Controller
 {
-    public function openOrCreate(Request $request)
-    {
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-        ]);
-
-        $adminId = Auth::id();
-        $userId  = $request->user_id;
-
-        // شوف لو فيه محادثة قديمة بين اليوزر والـ admin
-        $conversation = Conversation::where('user_id', $userId)
-            ->where('admin_id', $adminId)
-            ->first();
-
-        if (!$conversation) {
-            // لو مش موجودة، نعمل واحدة جديدة
-            $conversation = Conversation::create([
-                'user_id'  => $userId,
-                'admin_id' => $adminId,
-                'status'   => 'open',
-            ]);
-        }
-
-        return response()->json($conversation, 200);
-    }
+    public function __construct(protected ConversationServiceInterface $service)
+    {}
     public function index()
     {
-        return Conversation::with('messages')->get();
+        $user = Auth::user();
+        $isAdmin = $user->hasRole(['admin', 'super-admin']);
+        return $this->service->indexForUser($user->id, $isAdmin);
     }
 
     public function store(Request $request)
     {
-        return Conversation::create([
-            'user_id' =>Auth::id(), 
-            'status' => 'open',
-        ]);
+        $user = Auth::user();
+        $conversation = $this->service->storeIfNotExists($user->id);
+        return response()->json($conversation, 200);
+    }
+
+    public function openOrCreate(OpenOrCreateConversationRequest $request)
+    {
+        $user = Auth::user();
+        $userId = $request->user_id;
+
+        // If it's a regular user, they can only create their own conversation
+        if (!$user->hasRole(['admin', 'super-admin']) && $user->id !== $userId) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $conversation = $this->service->storeIfNotExists($userId, $user->hasRole(['admin','super-admin']) ? $user->id : null);
+        return response()->json($conversation->load('messages.attachments'), 200);
     }
 
     public function show($id)
     {
-        return Conversation::with('messages.attachments')->findOrFail($id);
+        $user = Auth::user();
+        $conversation = $this->service->show($id);
+
+        // Check permissions
+        if (!$user->hasRole(['admin', 'super-admin']) && $conversation->user_id !== $user->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        return $conversation;
     }
 
     public function close($id)
     {
+        $user = Auth::user();
         $conversation = Conversation::findOrFail($id);
-        $conversation->update(['status' => 'closed']);
 
-        return $conversation;
+        // Check permissions
+        if (!$user->hasRole(['admin', 'super-admin']) && $conversation->user_id !== $user->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        return $this->service->close($id);
     }
 }
+

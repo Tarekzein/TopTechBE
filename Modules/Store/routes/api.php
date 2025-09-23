@@ -213,8 +213,20 @@ Route::get('settings/test', [SettingController::class, 'test']);
 
     // Admin Analytics Routes
     Route::middleware(['auth:sanctum', 'role:admin|super-admin'])->prefix('admin/analytics')->group(function () {
-        Route::get('/vendors', [AnalyticsController::class, 'getAllVendorsAnalytics']);
+        // Global/admin-level overview used on dashboard home
         Route::get('/summary', [AnalyticsController::class, 'getSummary']);
+
+        // Revenue, Orders, Customers, Products analytics (admin scope)
+        Route::get('/revenue', [AnalyticsController::class, 'getRevenueAnalytics']);
+        Route::get('/orders', [AnalyticsController::class, 'getOrdersAnalytics']);
+        Route::get('/customers', [AnalyticsController::class, 'getCustomersAnalytics']);
+        Route::get('/products', [AnalyticsController::class, 'getProductsAnalytics']);
+
+        // Daily orders trend for Orders Trend widget
+        Route::get('/orders/daily', [AnalyticsController::class, 'getDailyOrdersTrend']);
+
+        // Vendor-focused admin analytics
+        Route::get('/vendors', [AnalyticsController::class, 'getAllVendorsAnalytics']);
         Route::get('/vendors/{vendorId}', [AnalyticsController::class, 'getVendorAnalytics']);
     });
 

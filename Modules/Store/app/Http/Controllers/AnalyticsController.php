@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Modules\Store\Services\AnalyticsService;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Support\Facades\Log;
@@ -162,6 +164,42 @@ class AnalyticsController extends Controller
                 'success' => false,
                 'message' => 'Failed to fetch revenue analytics. Please try again later.',
                 'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin: Daily orders trend between date range (defaults last 30 days)
+     */
+    public function getDailyOrdersTrend(Request $request): JsonResponse
+    {
+        try {
+            try {
+                $from = $request->filled('date_from') ? Carbon::parse($request->get('date_from')) : now()->subDays(30);
+            } catch (\Throwable $e) { $from = now()->subDays(30); }
+            try {
+                $to = $request->filled('date_to') ? Carbon::parse($request->get('date_to')) : now();
+            } catch (\Throwable $e) { $to = now(); }
+            if ($from->greaterThan($to)) { [$from, $to] = [$to->copy(), $from->copy()]; }
+
+            $rows = DB::table('orders')
+                ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->whereBetween('created_at', [$from->startOfDay(), $to->endOfDay()])
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Analytics: Failed to fetch daily orders trend', [
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch daily orders trend',
             ], 500);
         }
     }

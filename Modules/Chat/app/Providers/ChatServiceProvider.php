@@ -36,6 +36,14 @@ class ChatServiceProvider extends ServiceProvider
     {
         $this->app->register(EventServiceProvider::class);
         $this->app->register(RouteServiceProvider::class);
+
+        // Bind repositories
+        $this->app->bind(\Modules\Chat\Repositories\Contracts\ConversationRepositoryInterface::class, \Modules\Chat\Repositories\Eloquent\EloquentConversationRepository::class);
+        $this->app->bind(\Modules\Chat\Repositories\Contracts\MessageRepositoryInterface::class, \Modules\Chat\Repositories\Eloquent\EloquentMessageRepository::class);
+
+        // Bind services
+        $this->app->bind(\Modules\Chat\Services\Contracts\ChatServiceInterface::class, \Modules\Chat\Services\ChatService::class);
+        $this->app->bind(\Modules\Chat\Services\Contracts\ConversationServiceInterface::class, \Modules\Chat\Services\ConversationService::class);
     }
 
     /**
