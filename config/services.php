@@ -38,5 +38,9 @@ return [
         'public_key' => env('GEIDEA_PUBLIC_KEY'),
         'api_password' => env('GEIDEA_API_PASSWORD'),
     ],
+    'openrouter' => [
+    'api_key' => env('OPENROUTER_API_KEY'),
+    'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
+    ],
 
 ];
