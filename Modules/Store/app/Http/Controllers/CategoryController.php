@@ -159,4 +159,21 @@ class CategoryController extends Controller
             ], 404);
         }
     }
+
+    public function getCategoriesTree(): JsonResponse
+    {
+        try {
+            $tree = $this->categoryService->getCategoriesTree();
+            
+            return response()->json([
+                'status' => 'success',
+                'data' => $tree
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
 } 

@@ -40,6 +40,7 @@ Route::prefix('store')->group(function () {
     Route::prefix('categories')->group(function () {
         // Public routes
         Route::get('/', [CategoryController::class, 'index'])->name('store.categories.index');
+        Route::get('/tree', [CategoryController::class, 'getCategoriesTree'])->name('store.categories.tree');
         Route::get('/root', [CategoryController::class, 'rootCategories'])->name('store.categories.root');
         Route::get('/{slug}', [CategoryController::class, 'showBySlug'])->name('store.categories.show.by.slug');
         Route::get('/id/{id}', [CategoryController::class, 'show'])->name('store.categories.show');

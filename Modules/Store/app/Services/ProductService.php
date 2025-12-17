@@ -33,6 +33,7 @@ class ProductService
     {
         $rules = [
             'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:products,slug' . ($id ? ",$id" : ''),
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
             'regular_price' => 'nullable|numeric|min:0',
@@ -49,7 +50,7 @@ class ProductService
             'serial_number' => 'nullable|string|max:50',
             'product_type' => 'required|in:simple,variable',
             'images' => 'nullable|array',
-            'images.*' => 'file|mimes:jpeg,png,jpg|max:2048',
+            'images.*' => 'file|mimes:jpeg,png,jpg',
             'category_id' => 'required|exists:categories,id',
             'vendor_id' => 'required|exists:vendors,id',
             'is_active' => 'boolean',
@@ -58,6 +59,13 @@ class ProductService
             'search' => 'nullable|string',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date',
+            // Shipping and dimensions
+            'weight' => 'nullable|numeric|min:0',
+            'weight_unit' => 'nullable|string|max:255',
+            'length' => 'nullable|numeric|min:0',
+            'width' => 'nullable|numeric|min:0',
+            'height' => 'nullable|numeric|min:0',
+            'dimension_unit' => 'nullable|string|max:255',
         ];
 
         $validator = Validator::make($data, $rules);
@@ -360,4 +368,4 @@ class ProductService
     {
         return $this->productRepository->search($query, $perPage);
     }
-} 
+}

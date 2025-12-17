@@ -6,6 +6,7 @@ use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Modules\Store\Models\Product;
+use Modules\Store\Models\Category;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Modules\Common\Services\CloudImageService;
@@ -31,19 +32,45 @@ class ProductRepository
                 }
             ]);
 
-            // Apply search filter (search by name or SKU)
             if (!empty($filters['search'])) {
-                $search = $filters['search'];
-                $query->where(function($q) use ($search) {
+                $search = trim($filters['search']);
+                $isNumeric = is_numeric($search);
+                $query->where(function($q) use ($search, $isNumeric) {
                     $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('slug', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
                       ->orWhere('sku', 'like', "%{$search}%")
-                      ->orWhere('description', 'like', "%{$search}%");
+                      ->orWhere('serial_number', 'like', "%{$search}%");
+                    if ($isNumeric) {
+                        $q->orWhere('price', '=', $search)
+                          ->orWhere('regular_price', '=', $search)
+                          ->orWhere('sale_price', '=', $search);
+                    }
+                    $q->orWhereHas('category', function($cq) use ($search) {
+                        $cq->where('name', 'like', "%{$search}%")
+                           ->orWhere('slug', 'like', "%{$search}%");
+                    })
+                      ->orWhereHas('vendor', function($vq) use ($search) {
+                        $vq->where('name', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('variations', function($vq) use ($search, $isNumeric) {
+                        $vq->where('sku', 'like', "%{$search}%")
+                           ->orWhere('attributes', 'like', "%{$search}%");
+                        if ($isNumeric) {
+                            $vq->orWhere('regular_price', '=', $search)
+                               ->orWhere('sale_price', '=', $search);
+                        }
+                      });
                 });
             }
 
-            // Apply category filter
             if (!empty($filters['category_id'])) {
-                $query->where('category_id', $filters['category_id']);
+                $categoryIds = $this->getCategoryAndDescendantIds((int)$filters['category_id']);
+                if (!empty($categoryIds)) {
+                    $query->whereIn('category_id', $categoryIds);
+                } else {
+                    $query->where('category_id', $filters['category_id']);
+                }
             }
 
             // Apply vendor filter
@@ -117,6 +144,31 @@ class ProductRepository
         } catch (Exception $e) {
             Log::error('Error fetching products: ' . $e->getMessage());
             throw new Exception('Failed to fetch products');
+        }
+    }
+
+    protected function getCategoryAndDescendantIds(int $categoryId): array
+    {
+        try {
+            $root = Category::with('children')->find($categoryId);
+            if (!$root) {
+                return [$categoryId];
+            }
+            $ids = [$root->id];
+            $stack = [$root];
+            while (!empty($stack)) {
+                $node = array_pop($stack);
+                foreach ($node->children as $child) {
+                    $ids[] = $child->id;
+                    $child->load('children');
+                    if ($child->children && $child->children->count() > 0) {
+                        $stack[] = $child;
+                    }
+                }
+            }
+            return array_values(array_unique($ids));
+        } catch (Exception $e) {
+            return [$categoryId];
         }
     }
 
@@ -329,4 +381,4 @@ class ProductRepository
             throw new Exception('Failed to search products');
         }
     }
-} 
+}

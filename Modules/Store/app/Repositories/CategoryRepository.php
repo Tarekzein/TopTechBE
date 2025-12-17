@@ -127,4 +127,35 @@ class CategoryRepository
             throw new Exception('Category not found');
         }
     }
-} 
+
+    /**
+     * Get category tree (root categories with all nested children)
+     */
+    public function getCategoriesTree(): Collection
+    {
+        try {
+            // Load all categories once to avoid N+1 queries
+            $all = Category::orderBy('name')->get();
+
+            // Group categories by parent_id for efficient lookup
+            $grouped = $all->groupBy('parent_id');
+
+            // Recursive closure to build the tree
+            $buildTree = function ($parentId) use (&$buildTree, $grouped): Collection {
+                $nodes = ($grouped->get($parentId, collect()))->map(function (Category $category) use (&$buildTree): Category {
+                    $children = $buildTree($category->id);
+                    // Attach children as an Eloquent relation (expects Eloquent Collection)
+                    $category->setRelation('children', $children);
+                    return $category;
+                });
+                return new Collection($nodes->all());
+            };
+
+            // Root categories have a NULL parent_id
+            return $buildTree(null);
+        } catch (Exception $e) {
+            Log::error('Error building categories tree: ' . $e->getMessage());
+            throw new Exception('Failed to build categories tree');
+        }
+    }
+}

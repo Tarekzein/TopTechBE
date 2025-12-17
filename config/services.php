@@ -42,5 +42,10 @@ return [
     'api_key' => env('OPENROUTER_API_KEY'),
     'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
     ],
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
+        'api_key' => env('CLOUDINARY_API_KEY'),
+        'api_secret' => env('CLOUDINARY_API_SECRET'),
+    ],
 
 ];

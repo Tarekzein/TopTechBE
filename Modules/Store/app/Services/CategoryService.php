@@ -6,6 +6,7 @@ use Exception;
 use Illuminate\Support\Facades\Validator;
 use Modules\Store\Repositories\CategoryRepository;
 use Modules\Common\Services\CloudImageService;
+use Illuminate\Database\Eloquent\Collection;
 
 class CategoryService
 {
@@ -114,5 +115,13 @@ class CategoryService
     public function getCategoryBySlug(string $slug)
     {
         return $this->categoryRepository->findBySlug($slug);
+    }
+
+    /**
+     * Get category tree
+     */
+    public function getCategoriesTree(): Collection
+    {
+        return $this->categoryRepository->getCategoriesTree();
     }
 }

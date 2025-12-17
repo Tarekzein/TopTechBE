@@ -16,9 +16,10 @@ class CloudImageService
 
     public function __construct()
     {
-        $this->cloud_name = env('CLOUDINARY_CLOUD_NAME');
-        $this->api_key = env('CLOUDINARY_API_KEY');
-        $this->api_secret = env('CLOUDINARY_API_SECRET');
+        $this->cloud_name = config('services.cloudinary.cloud_name');
+        $this->api_key = config('services.cloudinary.api_key');
+        $this->api_secret = config('services.cloudinary.api_secret');
+        
         // Load Cloudinary configuration from environment variables
         Configuration::instance([
             'cloud' => [
